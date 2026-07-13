@@ -1,0 +1,16 @@
+{
+  "name": "sharpen",
+  "owner": {
+    "name": "Juan Andrés Núñez"
+  },
+  "metadata": {
+    "description": "Sharpen your engineering skills with timed challenges solved in the browser, mentored by AI."
+  },
+  "plugins": [
+    {
+      "name": "sharpen",
+      "source": "./",
+      "description": "Timed Git challenges in your browser with a Socratic AI mentor. Installs: 1 skill (sharpen)."
+    }
+  ]
+}

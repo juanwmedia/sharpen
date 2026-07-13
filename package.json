@@ -1,0 +1,25 @@
+{
+  "name": "sharpen",
+  "version": "0.1.0",
+  "description": "Timed Git challenges in your browser, with a Socratic AI mentor. A Claude Code plugin.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node server/index.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3",
+    "express": "^5.1.0",
+    "isomorphic-git": "^1.38.0",
+    "just-bash": "^2.14.5"
+  },
+  "devDependencies": {
+    "@wterm/core": "^0.3.0",
+    "@wterm/dom": "^0.3.0",
+    "@wterm/just-bash": "^0.3.0",
+    "esbuild": "^0.25.0",
+    "vitest": "^3.0.0"
+  }
+}
