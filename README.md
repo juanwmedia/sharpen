@@ -62,11 +62,18 @@ silently under a live ranking.
 
 ## Development
 
+Stack: Vue 3 + TypeScript (strict) + Vite for the arena SPA; the engine and
+the Node server are plain TypeScript (run via tsx). The engine stays
+framework-agnostic on purpose: it runs in the browser, in the server's replay
+validation, and in v2's CI Action.
+
 ```
 npm install
-npm run build     # bundle the SPA (esbuild)
-npm test          # vitest: porcelain + challenge verdicts
-npm run dev       # start the server on http://127.0.0.1:4517
+npm run dev        # Vite dev server with HMR (proxies /api to :4517)
+npm run start      # the arena server on http://127.0.0.1:4517
+npm run build      # typecheck (vue-tsc) + production build to dist/
+npm test           # vitest: porcelain, verdicts, fs bridge, mentor queue, API
+npm run typecheck  # vue-tsc --noEmit
 ```
 
 Read `docs/api-notes.md` before touching engine code: it records the verified

@@ -3,22 +3,41 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
+import type { Evidence, LeaderboardRow, Verdict } from '../engine/types.ts'
+import type { Run } from './runs.ts'
 
 const require = createRequire(import.meta.url)
-const ENGINE_VERSION = require('../package.json').version
+const ENGINE_VERSION = (require('../package.json') as { version: string }).version
 
 const dataDir = process.env.SHARPEN_DATA_DIR ?? join(homedir(), '.sharpen')
 const leaderboardPath = join(dataDir, 'leaderboard.json')
 const evidenceDir = join(dataDir, 'evidence')
 
-async function ensureDirs() {
+interface LeaderboardEntry {
+  player: string
+  challengeId: string
+  pass: boolean
+  durationMs: number
+  attempts: number
+  score: number
+  runId: string
+  stateHash: string
+  date: string
+}
+
+interface LeaderboardFile {
+  schema: number
+  entries: LeaderboardEntry[]
+}
+
+async function ensureDirs(): Promise<void> {
   await mkdir(evidenceDir, { recursive: true })
 }
 
 // Append-only operational log: the mentor pipeline was undebuggable without
 // it (stdout goes nowhere when the server runs detached).
 const logPath = join(dataDir, 'server.log')
-export function slog(message) {
+export function slog(message: string): void {
   try {
     mkdirSync(dataDir, { recursive: true })
     appendFileSync(logPath, `${new Date().toISOString()} ${message}\n`)
@@ -29,17 +48,18 @@ export function slog(message) {
 
 // Evidence is the unit of trust for the ranking. It already carries every
 // field v2's CI replay validation needs (nonce stays null until v3).
-export async function saveEvidence(run, verdict) {
+export async function saveEvidence(run: Run, verdict: Verdict): Promise<Evidence> {
   await ensureDirs()
-  const evidence = {
+  const evidence: Evidence = {
     schema: 1,
     engineVersion: ENGINE_VERSION,
     runId: run.id,
     challengeId: run.challengeId,
     player: run.player,
-    startedAt: run.startedAt,
+    // Evidence is only written for runs that have started, so startedAt is set.
+    startedAt: run.startedAt!,
     submittedAt: Date.now(),
-    durationMs: Date.now() - run.startedAt,
+    durationMs: Date.now() - run.startedAt!,
     attempts: run.attempts,
     transcript: run.transcript.map((t) => t.command),
     pass: verdict.pass,
@@ -51,9 +71,9 @@ export async function saveEvidence(run, verdict) {
   return evidence
 }
 
-async function loadLeaderboard() {
+async function loadLeaderboard(): Promise<LeaderboardFile> {
   try {
-    return JSON.parse(await readFile(leaderboardPath, 'utf8'))
+    return JSON.parse(await readFile(leaderboardPath, 'utf8')) as LeaderboardFile
   } catch {
     return { schema: 1, entries: [] }
   }
@@ -63,12 +83,12 @@ async function loadLeaderboard() {
 // pass => max(10, 100 - seconds elapsed). Fail/timeout => 0 (evidence is
 // still recorded). No attempt penalty: every Enter validates by design, so
 // "attempts" measures commands, not deliberate tries.
-export function scoreFor({ pass, durationMs }) {
+export function scoreFor({ pass, durationMs }: { pass: boolean; durationMs: number }): number {
   if (!pass) return 0
   return Math.max(10, 100 - Math.floor(durationMs / 1000))
 }
 
-export async function recordResult(evidence) {
+export async function recordResult(evidence: Evidence): Promise<void> {
   await ensureDirs()
   const board = await loadLeaderboard()
   board.entries.push({
@@ -85,9 +105,9 @@ export async function recordResult(evidence) {
   await writeFile(leaderboardPath, JSON.stringify(board, null, 2))
 }
 
-export async function leaderboard() {
+export async function leaderboard(): Promise<LeaderboardRow[]> {
   const board = await loadLeaderboard()
-  const byPlayer = new Map()
+  const byPlayer = new Map<string, LeaderboardRow>()
   for (const entry of board.entries) {
     const agg = byPlayer.get(entry.player) ?? {
       player: entry.player,

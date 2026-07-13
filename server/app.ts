@@ -3,25 +3,24 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import express from 'express'
-import { challengeSummaries } from '../challenges/index.mjs'
-import { Mentor, followUpPrompt, hintPrompt, liveQuestionPrompt, praisePrompt, revealPrompt } from './mentor.mjs'
-import { RunStore } from './runs.mjs'
-import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.mjs'
+import { challengeSummaries } from '../challenges/index.ts'
+import { Mentor, followUpPrompt, hintPrompt, liveQuestionPrompt, praisePrompt, revealPrompt } from './mentor.ts'
+import { RunStore, type Run } from './runs.ts'
+import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const PORT = Number(process.env.SHARPEN_PORT ?? 4517)
 
-const app = express()
+export const app = express()
 app.use(express.json())
-app.use(express.static(join(root, 'web')))
+app.use(express.static(join(root, 'dist')))
 
-const runs = new RunStore()
+export const runs = new RunStore()
 
 // The GitHub login is the canonical player identity (it is also what v2's
 // Issue-based submissions will be signed with) and it makes avatars work:
 // https://github.com/<login>.png. Fallbacks: git config name, then anonymous.
-let cachedPlayer = null
-async function defaultPlayer() {
+let cachedPlayer: string | null = null
+async function defaultPlayer(): Promise<string> {
   if (cachedPlayer) return cachedPlayer
   const exec = promisify(execFile)
   try {
@@ -39,7 +38,7 @@ async function defaultPlayer() {
   return cachedPlayer
 }
 
-function mentorFor(run) {
+function mentorFor(run: Run): Mentor {
   if (!run.mentor) {
     run.mentor = new Mentor({
       onDelta: (text) => runs.emit(run, 'mentor-delta', { text }),
@@ -59,9 +58,15 @@ function mentorFor(run) {
 // Every mentor request goes through here so the player immediately sees the
 // thinking indicator: a fresh `claude -p` takes seconds to first token, and
 // that silence must have a face.
-function askMentor(run, prompt, opts) {
-  const accepted = mentorFor(run).ask(prompt, opts)
-  slog(`run=${run.id} mentor ask accepted=${accepted} turns=${run.mentor.turns} queued=${run.mentor.queue.length}`)
+function askMentor(run: Run, prompt: string, opts?: { coalesce?: boolean }): boolean {
+  // Hermetic-test escape hatch: SHARPEN_NO_MENTOR=1 skips spawning the claude
+  // CLI entirely. Chosen over a mentorFactory injection because this module
+  // exports a built app instance, not a builder, so an env flag is the
+  // cleanest seam. No mentor events are emitted and asks report accepted=false.
+  if (process.env.SHARPEN_NO_MENTOR === '1') return false
+  const mentor = mentorFor(run)
+  const accepted = mentor.ask(prompt, opts)
+  slog(`run=${run.id} mentor ask accepted=${accepted} turns=${mentor.turns} queued=${mentor.queue.length}`)
   if (accepted) runs.emit(run, 'mentor-thinking', {})
   return accepted
 }
@@ -138,7 +143,7 @@ app.post('/api/runs/:id/submit', async (req, res) => {
         challenge: run.challenge,
         transcript: run.transcript,
         verdict,
-        remainingMs: Math.max(0, run.deadline - Date.now()),
+        remainingMs: Math.max(0, (run.deadline ?? 0) - Date.now()),
       }),
       { coalesce: true }
     )
@@ -171,14 +176,3 @@ app.post('/api/runs/:id/expire', async (req, res) => {
   runs.emit(run, 'leaderboard-updated', {})
   res.json({ recorded: true })
 })
-
-const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`sharpen listening on http://127.0.0.1:${PORT}`)
-})
-
-for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, () => {
-    server.close(() => process.exit(0))
-    setTimeout(() => process.exit(0), 1500).unref()
-  })
-}

@@ -1,13 +1,14 @@
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createInterface } from 'node:readline'
+import type { Challenge, Verdict } from '../engine/types.ts'
 
 // One Mentor per run. Spawns `claude -p` per turn (open-design pattern: the
 // server creates agent turns; nothing blocks waiting on the model) and keeps
 // conversation memory via --resume. Text-only: --tools "" disables everything.
 
 const MODEL = process.env.SHARPEN_MENTOR_MODEL ?? 'sonnet'
-const MAX_TURNS = 8
+export const MAX_TURNS = 8
 const INACTIVITY_MS = 90_000
 
 const SYSTEM_PROMPT = `You are the sharpen arena mentor: a Socratic senior engineer watching a player
@@ -29,22 +30,59 @@ Hard rules:
 
 const MAX_QUEUE = 3
 
+// Structural view of the spawned claude process: everything the mentor
+// touches, and nothing more, so tests can substitute a fake child.
+export interface MentorChild {
+  stdin: { write(data: string): void; end(): void }
+  stdout: NodeJS.ReadableStream
+  stderr: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown }
+  on(event: 'error', listener: (err: NodeJS.ErrnoException) => void): unknown
+  on(event: 'close', listener: (code: number | null) => void): unknown
+  kill(signal?: NodeJS.Signals): unknown
+}
+
+export type SpawnFn = (
+  command: string,
+  args: string[],
+  options: { stdio: ['pipe', 'pipe', 'pipe'] }
+) => MentorChild
+
+export interface MentorOptions {
+  onDelta: (text: string) => void
+  onDone: () => void
+  onError: (kind: string, detail: string) => void
+  /** Injectable process spawner so tests can fake the claude CLI. */
+  spawnFn?: SpawnFn
+}
+
+interface StreamEvent {
+  type?: string
+  event?: { delta?: { type?: string; text?: string } }
+  result?: unknown
+}
+
 export class Mentor {
-  constructor({ onDelta, onDone, onError }) {
+  onDelta: (text: string) => void
+  onDone: () => void
+  onError: (kind: string, detail: string) => void
+  spawnFn: SpawnFn
+  sessionId: string | null = null
+  turns = 0
+  busy = false
+  queue: string[] = []
+
+  constructor({ onDelta, onDone, onError, spawnFn }: MentorOptions) {
     this.onDelta = onDelta
     this.onDone = onDone
     this.onError = onError
-    this.sessionId = null
-    this.turns = 0
-    this.busy = false
-    this.queue = []
+    this.spawnFn = spawnFn ?? ((command, args, options) => spawn(command, args, options))
   }
 
   // Never drop a request silently: spawning a turn takes seconds, so player
   // questions that arrive mid-turn are queued and drained in order. Hints pass
   // `coalesce: true`: if the mentor is already speaking, a second hint about
   // the same failure adds nothing, so it merges into the ongoing turn.
-  ask(prompt, { coalesce = false } = {}) {
+  ask(prompt: string, { coalesce = false }: { coalesce?: boolean } = {}): boolean {
     if (this.turns + this.queue.length >= MAX_TURNS) {
       this.onError('mentor-budget', 'The mentor reached its turn budget for this run.')
       return false
@@ -62,7 +100,7 @@ export class Mentor {
     return true
   }
 
-  _run(prompt) {
+  _run(prompt: string): boolean {
     this.busy = true
     this.turns += 1
 
@@ -82,18 +120,18 @@ export class Mentor {
       args.push('--session-id', this.sessionId)
     }
 
-    let child
+    let child: MentorChild
     try {
-      child = spawn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] })
+      child = this.spawnFn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (err) {
       this.busy = false
-      this.onError('mentor-unavailable', String(err?.message ?? err))
+      this.onError('mentor-unavailable', String(err instanceof Error ? err.message : err))
       return false
     }
 
     let sawText = false
     let stderrTail = ''
-    const finish = (kind, detail) => {
+    const finish = (kind: string, detail = '') => {
       clearTimeout(watchdog)
       if (!this.busy) return
       this.busy = false
@@ -122,9 +160,9 @@ export class Mentor {
     const lines = createInterface({ input: child.stdout })
     lines.on('line', (line) => {
       poke()
-      let event
+      let event: StreamEvent
       try {
-        event = JSON.parse(line)
+        event = JSON.parse(line) as StreamEvent
       } catch {
         return
       }
@@ -153,7 +191,12 @@ export class Mentor {
   }
 }
 
-export function hintPrompt({ challenge, transcript, verdict, remainingMs }) {
+export function hintPrompt({ challenge, transcript, verdict, remainingMs }: {
+  challenge: Challenge
+  transcript: Array<{ command: string; output: string }>
+  verdict: Verdict
+  remainingMs: number
+}): string {
   const attempts = transcript.map((t) => `$ ${t.command}\n${t.output}`.trim()).join('\n')
   const failed = verdict.checks.filter((c) => !c.pass).map((c) => `- ${c.name}: ${c.detail}`).join('\n')
   return `LIVE CHALLENGE (do not reveal the solution). ${Math.round(remainingMs / 1000)}s left.
@@ -170,7 +213,10 @@ ${failed}
 Give your Socratic hint now.`
 }
 
-export function revealPrompt({ challenge, transcript }) {
+export function revealPrompt({ challenge, transcript }: {
+  challenge: Challenge
+  transcript: Array<{ command: string }>
+}): string {
   const attempts = transcript.map((t) => `$ ${t.command}`).join('\n')
   return `TIMER EXPIRED. Reveal and teach.
 
@@ -185,17 +231,17 @@ ${attempts || '(nothing)'}
 Explain the solution and why it works, tying it to their attempts.`
 }
 
-export function praisePrompt({ challenge, durationMs }) {
+export function praisePrompt({ challenge, durationMs }: { challenge: Challenge; durationMs: number }): string {
   return `The player SOLVED "${challenge.title}" in ${Math.round(durationMs / 1000)}s.
 In one or two sentences: congratulate briefly and name the ONE concept this
 challenge was really about. Then offer to answer questions.`
 }
 
-export function followUpPrompt(question) {
+export function followUpPrompt(question: string): string {
   return `Player follow-up question: ${question}`
 }
 
-export function liveQuestionPrompt(question) {
+export function liveQuestionPrompt(question: string): string {
   return `LIVE CHALLENGE, clock still running (do not reveal the solution or name the exact command/flags).
 The player asks mid-run: ${question}
 Answer Socratically in 1-2 sentences: a nudge or a counter-question, never the answer.`

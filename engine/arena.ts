@@ -1,9 +1,11 @@
 import * as git from 'isomorphic-git'
+import type { FsClient } from 'isomorphic-git'
 import { Bash, InMemoryFs } from 'just-bash'
-import { createGitFs } from './fs-bridge.mjs'
-import { createGitCommand } from './porcelain/git-command.mjs'
-import { dirname, join } from './paths.mjs'
-import { takeSnapshot, stateHash } from './snapshot.mjs'
+import { createGitFs } from './fs-bridge.ts'
+import { createGitCommand } from './porcelain/git-command.ts'
+import { dirname, join } from './paths.ts'
+import { takeSnapshot, stateHash } from './snapshot.ts'
+import type { Arena, Challenge, ChallengeSetupEnv } from './types.ts'
 
 export const REPO_DIR = '/repo'
 const SETUP_AUTHOR = { name: 'Riley Ortega', email: 'riley@sharpen.local' }
@@ -15,18 +17,21 @@ const BASE_TIMESTAMP = 1767225600
 // shell and git, a repo built by the challenge's deterministic setup, and a
 // bash whose `git` is our porcelain. Runs identically in browser and Node;
 // that symmetry is what makes CI replay validation possible later.
-export async function createArena(challenge) {
+export async function createArena(challenge: Challenge): Promise<Arena> {
   const jbFs = new InMemoryFs()
   const gitFs = createGitFs(jbFs)
+  // GitFs erases the named PromiseFsClient keys behind a Record (see
+  // types.ts), so it is not directly assignable to FsClient; convert once.
+  const fs = gitFs as unknown as FsClient
   const dir = REPO_DIR
 
   let tick = 0
   const clock = () => ({ timestamp: BASE_TIMESTAMP + tick++ * 60, timezoneOffset: 0 })
 
   await jbFs.mkdir(dir, { recursive: true })
-  await git.init({ fs: gitFs, dir, defaultBranch: 'main' })
+  await git.init({ fs, dir, defaultBranch: 'main' })
 
-  const setup = {
+  const setup: ChallengeSetupEnv = {
     fs: jbFs,
     git,
     gitFs,
@@ -41,17 +46,17 @@ export async function createArena(challenge) {
       await jbFs.rm(join(dir, path), { recursive: true, force: true })
     },
     async add(...paths) {
-      for (const p of paths) await git.add({ fs: gitFs, dir, filepath: p })
+      for (const p of paths) await git.add({ fs, dir, filepath: p })
     },
     async commit(message) {
       const author = { ...SETUP_AUTHOR, ...clock() }
-      return git.commit({ fs: gitFs, dir, message, author, committer: author })
+      return git.commit({ fs, dir, message, author, committer: author })
     },
     async branch(name, { checkout = false } = {}) {
-      await git.branch({ fs: gitFs, dir, ref: name, checkout })
+      await git.branch({ fs, dir, ref: name, checkout })
     },
     async checkout(ref) {
-      await git.checkout({ fs: gitFs, dir, ref })
+      await git.checkout({ fs, dir, ref })
     },
   }
   await challenge.setup(setup)

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createArena } from '../engine/arena.mjs'
-import challenge from '../challenges/git/clean-sweep.mjs'
+import { createArena } from '../engine/arena.ts'
+import challenge from '../challenges/git/clean-sweep.ts'
 
-const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '')
+const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
 
 async function freshArena() {
   return createArena(challenge)

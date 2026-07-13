@@ -1,4 +1,5 @@
-import { statusOf, untrackedFiles } from '../../engine/snapshot.mjs'
+import { statusOf, untrackedFiles } from '../../engine/snapshot.ts'
+import type { Challenge, Check } from '../../engine/types.ts'
 
 const DIRTY_CLIENT = `export async function fetchNotes(patientId: string) {
   const response = await fetch(\`/api/notes/\${patientId}\`)
@@ -55,7 +56,7 @@ export default {
   },
 
   async assert({ snapshot, fs, dir }) {
-    const checks = []
+    const checks: Check[] = []
 
     const untracked = untrackedFiles(snapshot)
     checks.push({
@@ -95,4 +96,4 @@ export default {
 
     return { pass: checks.every((c) => c.pass), checks }
   },
-}
+} satisfies Challenge

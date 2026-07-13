@@ -13,11 +13,11 @@ mentor, grade, or watch the game from this session.
 
 ## Steps
 
-1. Check the build exists: if `${CLAUDE_PLUGIN_ROOT}/web/dist/app.js` is
+1. Check the build exists: if `${CLAUDE_PLUGIN_ROOT}/dist/index.html` is
    missing, run `npm install --prefix ${CLAUDE_PLUGIN_ROOT}` and then
    `npm run build --prefix ${CLAUDE_PLUGIN_ROOT}`.
 2. Start the server in the background:
-   `node ${CLAUDE_PLUGIN_ROOT}/server/index.mjs`
+   `npm run start --prefix ${CLAUDE_PLUGIN_ROOT}`
    It prints `sharpen listening on http://127.0.0.1:<port>` when ready
    (default port 4517, override with the `SHARPEN_PORT` env var).
 3. Open the printed URL in the user's browser (`open <url>` on macOS,

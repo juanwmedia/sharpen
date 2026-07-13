@@ -5,48 +5,68 @@
 //    tracks cwd via env.PWD): this also fixes upstream's double-execution
 //    cwd probe.
 //  - `onCommand(command, result)` hook so the arena can report the transcript
-//    and drive submission.
-//  - Empty-line Enter triggers `onSubmit()` instead of being a no-op: in the
-//    arena, Enter on an empty prompt means "validate me".
+//    and drive validation after every Enter.
+//  - Empty-line Enter triggers `onSubmit()`: in the arena, every Enter
+//    validates, an empty one included.
+
+import type { ExecResult } from 'just-bash'
+
+export interface TermShellOptions {
+  exec: (command: string) => Promise<ExecResult>
+  prompt: () => string
+  greeting?: string[]
+  onCommand?: (command: string, result: ExecResult) => Promise<void> | void
+  onSubmit?: () => Promise<void> | void
+  tabCandidates?: (word: string, isFirstWord: boolean) => Promise<string[]>
+}
+
+type Writer = (data: string) => void
 
 export class TermShell {
-  constructor({ exec, prompt, greeting = [], onCommand, onSubmit, tabCandidates }) {
-    this._exec = exec
-    this._prompt = prompt
-    this._greeting = greeting
-    this._onCommand = onCommand
-    this._onSubmit = onSubmit
-    this._tabCandidates = tabCandidates
-    this._write = null
-    this._line = ''
-    this._cursor = 0
-    this._history = []
-    this._historyPos = -1
-    this._busy = false
-    this._locked = false
+  private _exec: TermShellOptions['exec']
+  private _prompt: TermShellOptions['prompt']
+  private _greeting: string[]
+  private _onCommand: TermShellOptions['onCommand']
+  private _onSubmit: TermShellOptions['onSubmit']
+  private _tabCandidates: TermShellOptions['tabCandidates']
+  private _write: Writer | null = null
+  private _line = ''
+  private _cursor = 0
+  private _history: string[] = []
+  private _historyPos = -1
+  private _busy = false
+  private _locked = false
+
+  constructor(options: TermShellOptions) {
+    this._exec = options.exec
+    this._prompt = options.prompt
+    this._greeting = options.greeting ?? []
+    this._onCommand = options.onCommand
+    this._onSubmit = options.onSubmit
+    this._tabCandidates = options.tabCandidates
   }
 
-  attach(write) {
+  attach(write: Writer): void {
     this._write = write
     if (this._greeting.length) write(this._greeting.join('\r\n') + '\r\n')
     write(this._prompt())
   }
 
-  lock() {
+  lock(): void {
     this._locked = true
   }
 
-  unlock() {
+  unlock(): void {
     this._locked = false
   }
 
-  writeSystemLine(text) {
+  writeSystemLine(text: string): void {
     if (!this._write) return
     this._write(`\r\x1b[K${text}\r\n`)
     this._write(this._prompt() + this._line)
   }
 
-  async handleInput(data) {
+  async handleInput(data: string): Promise<void> {
     if (!this._write || this._busy || this._locked) return
     const write = this._write
 
@@ -105,7 +125,7 @@ export class TermShell {
       }
       let entry = ''
       if (this._historyPos >= 0 && this._historyPos < this._history.length) {
-        entry = this._history[this._historyPos]
+        entry = this._history[this._historyPos] ?? ''
       } else {
         this._historyPos = -1
       }
@@ -186,12 +206,12 @@ export class TermShell {
     }
   }
 
-  async _complete() {
+  private async _complete(): Promise<void> {
     if (!this._tabCandidates || !this._write) return
     const write = this._write
     const parts = this._line.split(/\s+/)
     const word = parts[parts.length - 1] ?? ''
-    let candidates = []
+    let candidates: string[] = []
     try {
       candidates = await this._tabCandidates(word, parts.length <= 1)
     } catch {
@@ -200,13 +220,13 @@ export class TermShell {
     candidates = candidates.filter((c) => c.startsWith(word) && c !== word)
     if (!candidates.length) return
     if (candidates.length === 1) {
-      const completion = candidates[0].slice(word.length)
+      const completion = (candidates[0] ?? '').slice(word.length)
       this._line += completion
       this._cursor += completion.length
       write(completion)
       return
     }
-    let common = candidates[0]
+    let common = candidates[0] ?? ''
     for (const candidate of candidates.slice(1)) {
       while (!candidate.startsWith(common)) common = common.slice(0, -1)
     }

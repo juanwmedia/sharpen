@@ -1,6 +1,9 @@
 import * as git from 'isomorphic-git'
+import type { FsClient } from 'isomorphic-git'
 import { defineCommand } from 'just-bash'
-import { dirname, repoRelative, resolve } from '../paths.mjs'
+import type { Command, ExecResult, IFileSystem } from 'just-bash'
+import { dirname, repoRelative, resolve } from '../paths.ts'
+import type { GitFs, StatusRow } from '../types.ts'
 
 // Hand-written git porcelain over isomorphic-git. This is the layer that makes
 // the arena feel like real git: faithful output, faithful refusals, and
@@ -25,17 +28,33 @@ const NOT_IN_ARENA = [
   'show', 'blame', 'apply', 'format-patch', 'worktree', 'submodule',
 ]
 
-const ok = (stdout = '') => ({ stdout, stderr: '', exitCode: 0 })
-const fail = (stderr, exitCode = 1) => ({ stdout: '', stderr, exitCode })
+const ok = (stdout = ''): ExecResult => ({ stdout, stderr: '', exitCode: 0 })
+const fail = (stderr: string, exitCode = 1): ExecResult => ({ stdout: '', stderr, exitCode })
 
-function shortOid(oid) {
+// isomorphic-git errors carry code/data/message; a cast keeps the original
+// output byte-identical (including "undefined" for message-less throws).
+interface GitErrorLike {
+  code?: string
+  message?: string
+  data?: { filepaths?: string[] }
+}
+const gitError = (err: unknown): GitErrorLike => err as GitErrorLike
+
+function shortOid(oid: string): string {
   return oid.slice(0, 7)
+}
+
+export interface GitCommandDeps {
+  gitFs: GitFs
+  jbFs: IFileSystem
+  dir: string
+  clock: () => { timestamp: number; timezoneOffset: number }
 }
 
 // --- status matrix interpretation -----------------------------------------
 // Row: [filepath, head(0|1), workdir(0|1|2), stage(0|1|2|3)]
 
-function classifyRow([, head, workdir, stage]) {
+function classifyRow([, head, workdir, stage]: StatusRow) {
   return {
     untracked: head === 0 && workdir === 2 && stage === 0,
     stagedNew: head === 0 && stage >= 2,
@@ -47,7 +66,7 @@ function classifyRow([, head, workdir, stage]) {
   }
 }
 
-function shortStatusCode(row) {
+function shortStatusCode(row: StatusRow): string {
   const c = classifyRow(row)
   if (c.untracked) return '??'
   let index = ' '
@@ -62,10 +81,12 @@ function shortStatusCode(row) {
 
 // --- context helpers --------------------------------------------------------
 
-export function createGitCommand({ gitFs, jbFs, dir, clock }) {
-  const fs = gitFs
+export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): Command {
+  // GitFs erases the named PromiseFsClient keys behind a Record (see
+  // types.ts), so it is not directly assignable to FsClient; convert once.
+  const fs = gitFs as unknown as FsClient
 
-  function toRepoPath(cwd, arg) {
+  function toRepoPath(cwd: string, arg: string): string {
     const rel = repoRelative(dir, resolve(cwd, arg))
     if (rel === null) {
       throw new Error(`fatal: '${arg}' is outside repository at '${dir}'`)
@@ -74,20 +95,20 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
   }
 
   // Expand a path argument (file, directory, or '.') to matching matrix rows.
-  function matchRows(matrix, repoPath) {
+  function matchRows(matrix: StatusRow[], repoPath: string): StatusRow[] {
     if (repoPath === '.') return matrix
     return matrix.filter(([file]) => file === repoPath || file.startsWith(repoPath + '/'))
   }
 
-  async function statusMatrix() {
+  async function statusMatrix(): Promise<StatusRow[]> {
     return git.statusMatrix({ fs, dir })
   }
 
-  async function currentBranch() {
+  async function currentBranch(): Promise<string | null> {
     return (await git.currentBranch({ fs, dir, fullname: false })) ?? null
   }
 
-  async function stageTrackedChanges(matrix) {
+  async function stageTrackedChanges(matrix: StatusRow[]): Promise<void> {
     for (const row of matrix) {
       const c = classifyRow(row)
       if (c.unstagedModified && row[1] === 1) {
@@ -100,13 +121,13 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
 
   // --- subcommands -----------------------------------------------------------
 
-  async function cmdStatus(args) {
+  async function cmdStatus(args: string[]): Promise<ExecResult> {
     const short = args.includes('-s') || args.includes('--short')
     const matrix = await statusMatrix()
     const branch = await currentBranch()
 
     if (short) {
-      const lines = []
+      const lines: string[] = []
       for (const row of matrix) {
         const code = shortStatusCode(row)
         if (code === '  ') continue
@@ -116,9 +137,9 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
       return ok(lines.length ? lines.join('\n') + '\n' : '')
     }
 
-    const staged = []
-    const unstaged = []
-    const untracked = []
+    const staged: string[] = []
+    const unstaged: string[] = []
+    const untracked: string[] = []
     for (const row of matrix) {
       const c = classifyRow(row)
       if (c.untracked) untracked.push(row[0])
@@ -152,14 +173,14 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return ok(out)
   }
 
-  async function cmdAdd(args, cwd) {
+  async function cmdAdd(args: string[], cwd: string): Promise<ExecResult> {
     const paths = args.filter((a) => !a.startsWith('-'))
     const all = args.includes('-A') || args.includes('--all')
     if (!paths.length && !all) {
       return fail('Nothing specified, nothing added.\nhint: Maybe you wanted to say \'git add .\'?\n')
     }
     const matrix = await statusMatrix()
-    const targets = all ? matrix : []
+    const targets: StatusRow[] = all ? matrix : []
     if (!all) {
       for (const p of paths) {
         const repoPath = toRepoPath(cwd, p)
@@ -178,7 +199,7 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return ok()
   }
 
-  async function cmdCommit(args) {
+  async function cmdCommit(args: string[]): Promise<ExecResult> {
     const mIndex = args.indexOf('-m')
     const all = args.includes('-a') || args.includes('-am')
     if (args.includes('-am')) args.splice(args.indexOf('-am'), 0, '-m')
@@ -212,9 +233,9 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return ok(`[${branch} ${shortOid(oid)}] ${message}\n`)
   }
 
-  async function cmdLog(args) {
+  async function cmdLog(args: string[]): Promise<ExecResult> {
     const oneline = args.includes('--oneline')
-    let depth
+    let depth: number | undefined
     const nIdx = args.indexOf('-n')
     if (nIdx >= 0) depth = Number(args[nIdx + 1])
     const dashN = args.find((a) => /^-\d+$/.test(a))
@@ -228,7 +249,7 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
       return fail(`fatal: your current branch '${branch}' does not have any commits yet\n`, 128)
     }
     const branch = await currentBranch()
-    const decorate = (i) =>
+    const decorate = (i: number) =>
       i === 0 ? ` ${ANSI.yellow}(${ANSI.cyan}HEAD -> ${ANSI.green}${branch}${ANSI.yellow})${ANSI.reset}` : ''
 
     if (oneline) {
@@ -249,11 +270,12 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return ok(blocks.join('\n'))
   }
 
-  async function cmdBranch(args) {
+  async function cmdBranch(args: string[]): Promise<ExecResult> {
     const flags = args.filter((a) => a.startsWith('-'))
     const names = args.filter((a) => !a.startsWith('-'))
+    const first = names[0]
     if (flags.includes('-d') || flags.includes('-D')) {
-      const name = names[0]
+      const name = first
       if (!name) return fail('fatal: branch name required\n', 128)
       try {
         await git.deleteBranch({ fs, dir, ref: name })
@@ -262,7 +284,7 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
         return fail(`error: branch '${name}' not found.\n`, 1)
       }
     }
-    if (!names.length) {
+    if (first === undefined) {
       const branches = await git.listBranches({ fs, dir })
       const current = await currentBranch()
       const lines = branches.map((b) =>
@@ -271,16 +293,16 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
       return ok(lines.join('\n') + (lines.length ? '\n' : ''))
     }
     try {
-      await git.branch({ fs, dir, ref: names[0] })
+      await git.branch({ fs, dir, ref: first })
       return ok()
     } catch (err) {
-      return fail(`fatal: ${err.message}\n`, 128)
+      return fail(`fatal: ${gitError(err).message}\n`, 128)
     }
   }
 
-  async function checkoutPaths(cwd, paths) {
+  async function checkoutPaths(cwd: string, paths: string[]): Promise<ExecResult> {
     const matrix = await statusMatrix()
-    const filepaths = []
+    const filepaths: string[] = []
     for (const p of paths) {
       const repoPath = toRepoPath(cwd, p)
       const rows = matchRows(matrix, repoPath).filter((row) => row[1] === 1)
@@ -295,60 +317,64 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return ok()
   }
 
-  async function switchBranch(name) {
+  async function switchBranch(name: string): Promise<ExecResult> {
     try {
       await git.checkout({ fs, dir, ref: name })
       return ok(`Switched to branch '${name}'\n`)
     } catch (err) {
-      if (err.code === 'NotFoundError') {
+      const e = gitError(err)
+      if (e.code === 'NotFoundError') {
         return fail(`error: pathspec '${name}' did not match any file(s) known to git\n`, 1)
       }
-      if (err.code === 'CheckoutConflictError') {
+      if (e.code === 'CheckoutConflictError') {
         return fail(
           'error: Your local changes to the following files would be overwritten by checkout:\n' +
-            (err.data?.filepaths ?? []).map((f) => `\t${f}`).join('\n') +
+            (e.data?.filepaths ?? []).map((f) => `\t${f}`).join('\n') +
             '\nPlease commit your changes or stash them before you switch branches.\nAborting\n',
           1
         )
       }
-      return fail(`fatal: ${err.message}\n`, 128)
+      return fail(`fatal: ${e.message}\n`, 128)
     }
   }
 
-  async function cmdCheckout(args, cwd) {
-    if (!args.length) return fail('fatal: you must specify a branch or paths\n', 128)
+  async function cmdCheckout(args: string[], cwd: string): Promise<ExecResult> {
+    const first = args[0]
+    if (first === undefined) return fail('fatal: you must specify a branch or paths\n', 128)
     const dashdash = args.indexOf('--')
     if (dashdash >= 0) return checkoutPaths(cwd, args.slice(dashdash + 1))
-    if (args[0] === '-b') {
+    if (first === '-b') {
       const name = args[1]
       if (!name) return fail('fatal: branch name required\n', 128)
       try {
         await git.branch({ fs, dir, ref: name, checkout: true })
         return ok(`Switched to a new branch '${name}'\n`)
       } catch (err) {
-        return fail(`fatal: ${err.message}\n`, 128)
+        return fail(`fatal: ${gitError(err).message}\n`, 128)
       }
     }
     const branches = await git.listBranches({ fs, dir })
-    if (branches.includes(args[0])) return switchBranch(args[0])
+    if (branches.includes(first)) return switchBranch(first)
     return checkoutPaths(cwd, args)
   }
 
-  async function cmdSwitch(args) {
+  async function cmdSwitch(args: string[]): Promise<ExecResult> {
     if (args[0] === '-c') {
-      if (!args[1]) return fail('fatal: branch name required\n', 128)
+      const name = args[1]
+      if (!name) return fail('fatal: branch name required\n', 128)
       try {
-        await git.branch({ fs, dir, ref: args[1], checkout: true })
-        return ok(`Switched to a new branch '${args[1]}'\n`)
+        await git.branch({ fs, dir, ref: name, checkout: true })
+        return ok(`Switched to a new branch '${name}'\n`)
       } catch (err) {
-        return fail(`fatal: ${err.message}\n`, 128)
+        return fail(`fatal: ${gitError(err).message}\n`, 128)
       }
     }
-    if (!args[0]) return fail('fatal: missing branch or commit argument\n', 128)
-    return switchBranch(args[0])
+    const target = args[0]
+    if (!target) return fail('fatal: missing branch or commit argument\n', 128)
+    return switchBranch(target)
   }
 
-  async function cmdRestore(args, cwd) {
+  async function cmdRestore(args: string[], cwd: string): Promise<ExecResult> {
     const staged = args.includes('--staged')
     const paths = args.filter((a) => !a.startsWith('-'))
     if (!paths.length) return fail('fatal: you must specify path(s) to restore\n', 128)
@@ -372,11 +398,11 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return checkoutPaths(cwd, paths)
   }
 
-  async function cmdClean(args, cwd) {
+  async function cmdClean(args: string[], cwd: string): Promise<ExecResult> {
     let force = false
     let dryRun = false
     let dirs = false
-    const paths = []
+    const paths: string[] = []
     for (const a of args) {
       if (a.startsWith('-') && a !== '--') {
         for (const ch of a.slice(1)) {
@@ -419,8 +445,8 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
       }
     }
 
-    const removeFiles = []
-    const removeDirs = new Set()
+    const removeFiles: string[] = []
+    const removeDirs = new Set<string>()
     for (const file of untracked) {
       const parent = dirname('/' + file).slice(1)
       if (!parent || trackedDirs.has(parent)) {
@@ -457,12 +483,12 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return ok(out ? out + '\n' : '')
   }
 
-  async function cmdRm(args, cwd) {
+  async function cmdRm(args: string[], cwd: string): Promise<ExecResult> {
     const cached = args.includes('--cached')
     const paths = args.filter((a) => !a.startsWith('-'))
     if (!paths.length) return fail('fatal: No pathspec was given. Which files should I remove?\n', 128)
     const matrix = await statusMatrix()
-    const out = []
+    const out: string[] = []
     for (const p of paths) {
       const repoPath = toRepoPath(cwd, p)
       const rows = matchRows(matrix, repoPath).filter((row) => row[1] === 1 || row[3] >= 1)
@@ -478,7 +504,7 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
     return ok(out.join('\n') + '\n')
   }
 
-  function cmdHelp() {
+  function cmdHelp(): ExecResult {
     return ok(
       'sharpen arena git: supported commands:\n' +
         '  status [-s|--short]      add <path>|-A          commit -m <msg> [-a]\n' +
@@ -526,7 +552,7 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }) {
           return fail(`git: '${sub}' is not a git command. See 'git --help'.\n`, 1)
       }
     } catch (err) {
-      return fail(`fatal: ${err.message}\n`, 128)
+      return fail(`fatal: ${gitError(err).message}\n`, 128)
     }
   })
 }
