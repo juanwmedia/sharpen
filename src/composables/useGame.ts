@@ -8,8 +8,10 @@ import type { Arena, Challenge, ChallengeSummary, Check, LeaderboardRow } from '
 export type RunStatus = 'idle' | 'countdown' | 'live' | 'passed' | 'revealed'
 
 export interface MentorItem {
-  role: 'mentor' | 'you' | 'system' | 'thinking'
+  role: 'mentor' | 'you' | 'you-cmd' | 'system' | 'thinking'
   text: string
+  /** Secondary line, e.g. the error a failed command printed. */
+  meta?: string
 }
 
 interface GameState {
@@ -142,6 +144,10 @@ export async function onCommand(command: string, result: ExecResult): Promise<vo
         'every Enter validates your repo state.\x1b[0m\r\n'
     )
   }
+  // Every command joins the conversation as a player bubble: the chat is the
+  // narrative of the run, the terminal keeps the full output.
+  const firstErrLine = result.exitCode !== 0 ? (result.stderr.split('\n')[0] ?? '') : ''
+  state.mentorFeed.push({ role: 'you-cmd', text: command, ...(firstErrLine ? { meta: firstErrLine } : {}) })
   if (state.status !== 'live') return
   await fetch(`/api/runs/${state.runId}/command`, {
     method: 'POST',
@@ -217,7 +223,7 @@ export async function tabCandidates(word: string, isFirstWord: boolean): Promise
 async function askMentor(question: string): Promise<void> {
   const trimmed = question.trim()
   if (!trimmed || !state.runId) return
-  state.mentorFeed.push({ role: 'you', text: `you: ${trimmed}` })
+  state.mentorFeed.push({ role: 'you', text: trimmed })
   const res = await fetch(`/api/runs/${state.runId}/ask`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

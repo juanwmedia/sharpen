@@ -4,7 +4,8 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { TermShell } from '../vendor/bash-shell.ts'
 import { execCommand, onCommand, registerTerminalWriter, submit, tabCandidates, useGame } from '../composables/useGame.ts'
 
-const props = defineProps<{ challengeTitle: string }>()
+const props = defineProps<{ challengeTitle: string; pinned?: boolean }>()
+defineEmits<{ 'toggle-pin': [] }>()
 
 const { state } = useGame()
 const host = ref<HTMLElement | null>(null)
@@ -12,7 +13,10 @@ let term: WTerm | null = null
 
 onMounted(async () => {
   if (!host.value) return
-  term = new WTerm(host.value, { cols: 100, rows: 26, cursorBlink: true, autoResize: true })
+  // Fixed geometry: 20 rows at the 20px row height equals the container
+  // exactly, so a fresh terminal never shows a scrollbar. Long output rolls
+  // into wterm's scrollback, which is when a scrollbar SHOULD appear.
+  term = new WTerm(host.value, { cols: 100, rows: 20, cursorBlink: true, autoResize: false })
   await term.init()
 
   const shell = new TermShell({
@@ -46,6 +50,15 @@ onBeforeUnmount(() => {
       <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
       <span class="term-title">you@sharpen · /repo</span>
       <span class="term-hint">every <kbd>Enter</kbd> validates</span>
+      <button
+        class="pin-btn"
+        :class="{ active: pinned }"
+        type="button"
+        :title="pinned ? 'Unpin terminal (scrolls with the page)' : 'Pin terminal (stays visible)'"
+        @click="$emit('toggle-pin')"
+      >
+        {{ pinned ? '📌' : '📍' }}
+      </button>
     </div>
     <div id="terminal" ref="host"></div>
   </div>

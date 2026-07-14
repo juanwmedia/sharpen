@@ -6,22 +6,20 @@ const props = defineProps<{
   feed: readonly MentorItem[]
   busy: boolean
   status: RunStatus
-  challengeTitle: string
-  statement: string
 }>()
 const emit = defineEmits<{ ask: [question: string] }>()
 
 const question = ref('')
 const feedEl = ref<HTMLElement | null>(null)
 
-// fl-next scroll ownership, simplified: follow the stream only when the
+// Scroll ownership (fl-next pattern): follow the conversation only when the
 // reader is already near the bottom; never yank them up mid-read.
 watch(
   () => props.feed.length + (props.feed[props.feed.length - 1]?.text.length ?? 0),
   async () => {
     const el = feedEl.value
     if (!el) return
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 90
     if (nearBottom) {
       await nextTick()
       el.scrollTop = el.scrollHeight
@@ -38,26 +36,33 @@ function send(): void {
 </script>
 
 <template>
-  <div class="mentor-card">
-    <p class="eyebrow">mentor <span class="mentor-dot" :class="{ live: busy }"></span></p>
-    <div ref="feedEl" class="mentor-feed">
-      <!-- The challenge statement stays pinned while the conversation grows
-           below it (pattern borrowed from FrontendLeap's pinned snippet). -->
-      <div class="pinned-statement">
-        <strong>{{ challengeTitle }}</strong>
-        <span>{{ statement }}</span>
-      </div>
+  <div class="chat-card">
+    <p class="eyebrow">conversation <span class="mentor-dot" :class="{ live: busy }"></span></p>
+    <div ref="feedEl" class="chat-feed">
       <p v-if="!feed.length" class="mentor-idle">
-        Ask me here anytime. While the clock runs I only nudge, never spoil; when it ends, I teach.
+        Your commands and the mentor's replies land here as a conversation. While the clock runs the
+        mentor only nudges, never spoils; when it ends, it teaches.
       </p>
-      <p
+      <div
         v-for="(item, i) in feed"
         :key="i"
-        class="msg"
-        :class="{ you: item.role === 'you', system: item.role === 'system', thinking: item.role === 'thinking' }"
+        class="bubble-row"
+        :class="{ mine: item.role === 'you' || item.role === 'you-cmd' }"
       >
-        {{ item.text }}
-      </p>
+        <div
+          class="bubble"
+          :class="{
+            cmd: item.role === 'you-cmd',
+            you: item.role === 'you',
+            mentor: item.role === 'mentor',
+            system: item.role === 'system',
+            thinking: item.role === 'thinking',
+          }"
+        >
+          <span v-if="item.role === 'you-cmd'" class="cmd-prompt">➜</span>{{ item.text }}
+          <span v-if="item.meta" class="bubble-meta">{{ item.meta }}</span>
+        </div>
+      </div>
     </div>
     <form class="mentor-form" @submit.prevent="send">
       <input
