@@ -14,11 +14,18 @@ export default {
   title: 'Clean sweep',
   difficulty: 'medium',
   timeLimitMs: 60_000,
-  statement:
-    'Your working tree mixes real work in progress with debug junk. ' +
-    'Get rid of every untracked file and directory. ' +
-    'The modified tracked file must keep its changes, nothing may be staged, ' +
-    'and history must stay untouched.',
+  statement: {
+    en:
+      'Your working tree mixes real work in progress with debug junk. ' +
+      'Get rid of every untracked file and directory. ' +
+      'The modified tracked file must keep its changes, nothing may be staged, ' +
+      'and history must stay untouched.',
+    es:
+      'Tu working tree mezcla trabajo real en curso con basura de depuración. ' +
+      'Elimina todos los archivos y directorios sin seguimiento. ' +
+      'El archivo trackeado modificado debe conservar sus cambios, no puede quedar nada en el stage ' +
+      'y el historial tiene que permanecer intacto.',
+  },
   // Commands the mentor may reference in hints. The porcelain itself decides
   // what runs; this list feeds the challenge UI and the mentor prompt.
   focusCommands: ['git status', 'git clean'],
@@ -60,9 +67,20 @@ export default {
 
     const untracked = untrackedFiles(snapshot)
     checks.push({
-      name: 'No untracked files remain',
+      name: {
+        en: 'No untracked files remain',
+        es: 'No queda ningún archivo sin seguimiento',
+      },
       pass: untracked.length === 0,
-      detail: untracked.length ? `still untracked: ${untracked.join(', ')}` : 'working tree has no junk left',
+      detail: untracked.length
+        ? {
+            en: `still untracked: ${untracked.join(', ')}`,
+            es: `todavía sin seguimiento: ${untracked.join(', ')}`,
+          }
+        : {
+            en: 'working tree has no junk left',
+            es: 'el working tree ya no tiene basura',
+          },
     })
 
     const clientState = statusOf(snapshot, 'src/api/client.ts')
@@ -73,25 +91,45 @@ export default {
       clientContent = ''
     }
     checks.push({
-      name: 'Work in progress survived, unstaged',
+      name: {
+        en: 'Work in progress survived, unstaged',
+        es: 'El trabajo en curso sobrevivió, fuera del stage',
+      },
       pass: clientState === 'modified' && clientContent === DIRTY_CLIENT,
       detail:
         clientState === 'modified'
-          ? 'src/api/client.ts still carries your uncommitted change'
-          : `src/api/client.ts is ${clientState} (expected: modified, unstaged)`,
+          ? {
+              en: 'src/api/client.ts still carries your uncommitted change',
+              es: 'src/api/client.ts conserva tu cambio sin commitear',
+            }
+          : {
+              en: `src/api/client.ts is ${clientState} (expected: modified, unstaged)`,
+              es: `src/api/client.ts está ${clientState} (esperado: modified, sin stage)`,
+            },
     })
 
     const staged = snapshot.status.some(([, , , stage]) => stage >= 2)
     checks.push({
-      name: 'Nothing staged',
+      name: {
+        en: 'Nothing staged',
+        es: 'Nada en el stage',
+      },
       pass: !staged,
-      detail: staged ? 'the index is not clean' : 'index untouched',
+      detail: staged
+        ? { en: 'the index is not clean', es: 'el índice no está limpio' }
+        : { en: 'index untouched', es: 'índice intacto' },
     })
 
     checks.push({
-      name: 'History untouched on main',
+      name: {
+        en: 'History untouched on main',
+        es: 'Historial intacto en main',
+      },
       pass: snapshot.head.branch === 'main' && snapshot.log.length === 2,
-      detail: `HEAD is ${snapshot.head.branch} with ${snapshot.log.length} commits (expected main with 2)`,
+      detail: {
+        en: `HEAD is ${snapshot.head.branch} with ${snapshot.log.length} commits (expected main with 2)`,
+        es: `HEAD es ${snapshot.head.branch} con ${snapshot.log.length} commits (esperado main con 2)`,
+      },
     })
 
     return { pass: checks.every((c) => c.pass), checks }

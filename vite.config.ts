@@ -1,14 +1,17 @@
+import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {
       // just-bash's browser bundle references node:zlib for its gzip
       // coreutils, which the arena does not need.
-      'node:zlib': fileURLToPath(new URL('./src/vendor/zlib-stub.ts', import.meta.url)),
+      'node:zlib': fileURLToPath(new URL('./src/shared/lib/zlib-stub.ts', import.meta.url)),
+      '@engine': fileURLToPath(new URL('./engine', import.meta.url)),
+      '@challenges': fileURLToPath(new URL('./challenges', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },

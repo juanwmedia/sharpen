@@ -120,7 +120,7 @@ describe('clean-sweep challenge verdict', () => {
     await arena.exec('git clean -fd')
     const verdict = await arena.verdict()
     expect(verdict.pass).toBe(false)
-    const failing = verdict.checks.filter((c) => !c.pass).map((c) => c.name)
+    const failing = verdict.checks.filter((c) => !c.pass).map((c) => c.name.en)
     expect(failing).toContain('Work in progress survived, unstaged')
   })
 

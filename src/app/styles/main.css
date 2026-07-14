@@ -1,0 +1,136 @@
+/* sharpen arena: terminal-forge identity, ember accent on steel blue-black,
+   monospace display voice. Deliberately dark-only: this is the arena at night.
+   Tailwind 4 CSS-first config: every color/font/animation below is a design
+   token; components consume them as utilities (bg-surface, text-muted...). */
+
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@theme {
+  --color-bg: #0e1420;
+  --color-bg-deep: #0a0f18;
+  --color-surface: #151d2c;
+  --color-surface-2: #1b2536;
+  --color-ink: #e8edf6;
+  --color-muted: #94a1b5;
+  --color-faint: #5d6a7e;
+  --color-line: rgb(148 161 181 / 0.16);
+  --color-line-strong: rgb(148 161 181 / 0.22);
+  --color-accent: #ff5a2e;
+  --color-accent-soft: rgb(255 90 46 / 0.12);
+  --color-ok: #46c05b;
+  --color-warn: #e3a72f;
+  --color-err: #ff5c57;
+  --color-term-ink: #d7e0ee;
+
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  --radius-panel: 14px;
+
+  --animate-caret-blink: caret-blink 1.1s steps(1) infinite;
+  --animate-pulse-beat: pulse-beat 1s ease-in-out infinite;
+  --animate-pulse-dot: pulse-beat 1.2s ease-in-out infinite;
+  --animate-thinking: thinking-pulse 1.4s ease-in-out infinite;
+  --animate-drop-in: drop-in 0.5s ease-out;
+
+  @keyframes caret-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes pulse-beat {
+    50% {
+      transform: scale(1.12);
+    }
+  }
+  @keyframes thinking-pulse {
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @keyframes drop-in {
+    from {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+}
+
+@layer base {
+  body {
+    background:
+      radial-gradient(1200px 500px at 80% -12%, var(--color-accent-soft), transparent 60%),
+      linear-gradient(180deg, var(--color-bg-deep), var(--color-bg) 30%);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    border: 1px solid var(--color-line);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: var(--color-muted);
+    background: var(--color-surface);
+  }
+}
+
+@layer components {
+  /* The arena's card surface, shared by every panel-shaped block. Utilities
+     on the element override it (e.g. the statement card widens its padding). */
+  .panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    padding: 18px 20px;
+  }
+}
+
+/* Third-party DOM (wterm renders into #terminal): these selectors target
+   classes we do not own, so they stay CSS instead of template utilities. */
+@layer components {
+  #terminal.wterm {
+    --term-fg: var(--color-term-ink);
+    --term-bg: transparent;
+    --term-cursor: var(--color-accent);
+    --term-color-1: #ff5c57;
+    --term-color-9: #ff5c57;
+    --term-color-2: #46c05b;
+    --term-color-10: #46c05b;
+    --term-color-3: #e3a72f;
+    --term-color-11: #e3a72f;
+    --term-color-4: #6ea8ff;
+    --term-color-12: #6ea8ff;
+    --term-color-6: #4ec9b0;
+    --term-color-14: #4ec9b0;
+    --term-font-family: var(--font-mono);
+    --term-font-size: 13.5px;
+    --term-line-height: 1.5;
+    --term-row-height: 20px;
+    background: transparent;
+    padding: 14px 18px 16px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  /* The cursor invites typing even before the terminal has focus: dim blink
+     unfocused, solid ember blink focused. */
+  #terminal.wterm.cursor-blink .term-cursor {
+    animation: cursor-blink 1.1s step-end infinite;
+  }
+  #terminal.wterm:not(.focused) .term-cursor {
+    opacity: 0.55;
+  }
+  #terminal:focus-within {
+    outline: none;
+  }
+}

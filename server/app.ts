@@ -4,11 +4,18 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import express from 'express'
 import { challengeSummaries } from '../challenges/index.ts'
+import { ARENA_EVENT, DEFAULT_LOCALE, LOCALES } from '../engine/types.ts'
 import { Mentor, followUpPrompt, hintPrompt, liveQuestionPrompt, praisePrompt, revealPrompt } from './mentor.ts'
-import { RunStore, type Run } from './runs.ts'
+import { RUN_STATUS, RunStore, type Run } from './runs.ts'
 import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+
+// Input caps: nothing here is security, just sane bounds on what lands in
+// prompts, logs and evidence files.
+const PLAYER_NAME_MAX_CHARS = 60
+const QUESTION_MAX_CHARS = 2000
+const LOG_DETAIL_MAX_CHARS = 300
 
 export const app = express()
 app.use(express.json())
@@ -41,14 +48,15 @@ async function defaultPlayer(): Promise<string> {
 function mentorFor(run: Run): Mentor {
   if (!run.mentor) {
     run.mentor = new Mentor({
-      onDelta: (text) => runs.emit(run, 'mentor-delta', { text }),
+      locale: run.locale,
+      onDelta: (text) => runs.emit(run, ARENA_EVENT.mentorDelta, { text }),
       onDone: () => {
         slog(`run=${run.id} mentor turn done`)
-        runs.emit(run, 'mentor-done')
+        runs.emit(run, ARENA_EVENT.mentorDone)
       },
       onError: (kind, detail) => {
-        slog(`run=${run.id} mentor ${kind}: ${String(detail).slice(0, 300)}`)
-        runs.emit(run, 'mentor-error', { kind, detail })
+        slog(`run=${run.id} mentor ${kind}: ${String(detail).slice(0, LOG_DETAIL_MAX_CHARS)}`)
+        runs.emit(run, ARENA_EVENT.mentorError, { kind, detail })
       },
     })
   }
@@ -67,7 +75,7 @@ function askMentor(run: Run, prompt: string, opts?: { coalesce?: boolean }): boo
   const mentor = mentorFor(run)
   const accepted = mentor.ask(prompt, opts)
   slog(`run=${run.id} mentor ask accepted=${accepted} turns=${mentor.turns} queued=${mentor.queue.length}`)
-  if (accepted) runs.emit(run, 'mentor-thinking', {})
+  if (accepted) runs.emit(run, ARENA_EVENT.mentorThinking, {})
   return accepted
 }
 
@@ -84,8 +92,9 @@ app.get('/api/leaderboard', async (_req, res) => {
 })
 
 app.post('/api/runs', async (req, res) => {
-  const player = (req.body?.player ?? (await defaultPlayer())).slice(0, 60)
-  const run = runs.create({ challengeId: req.body?.challengeId, player })
+  const player = (req.body?.player ?? (await defaultPlayer())).slice(0, PLAYER_NAME_MAX_CHARS)
+  const locale = LOCALES.find((l) => l === req.body?.locale) ?? DEFAULT_LOCALE
+  const run = runs.create({ challengeId: req.body?.challengeId, player, locale })
   if (!run) return res.status(404).json({ error: 'unknown challenge' })
   res.json({ runId: run.id, player })
 })
@@ -107,7 +116,7 @@ app.post('/api/runs/:id/start', (req, res) => {
   if (!run) return res.status(404).json({ error: 'unknown run' })
   runs.start(run, (timedOut) => {
     slog(`run=${timedOut.id} timeout`)
-    runs.emit(timedOut, 'timeout', {})
+    runs.emit(timedOut, ARENA_EVENT.timeout, {})
     askMentor(timedOut, revealPrompt(timedOut))
   })
   slog(`run=${run.id} started player=${run.player} challenge=${run.challengeId}`)
@@ -117,7 +126,7 @@ app.post('/api/runs/:id/start', (req, res) => {
 app.post('/api/runs/:id/command', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
-  if (run.status === 'live' && typeof req.body?.command === 'string') {
+  if (run.status === RUN_STATUS.live && typeof req.body?.command === 'string') {
     runs.recordCommand(run, req.body.command, req.body.output)
   }
   res.status(204).end()
@@ -126,15 +135,15 @@ app.post('/api/runs/:id/command', (req, res) => {
 app.post('/api/runs/:id/submit', async (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
-  if (run.status !== 'live') return res.status(409).json({ error: `run is ${run.status}` })
+  if (run.status !== RUN_STATUS.live) return res.status(409).json({ error: `run is ${run.status}` })
 
   const verdict = await runs.submit(run)
-  runs.emit(run, 'verdict', { pass: verdict.pass, checks: verdict.checks, attempts: run.attempts })
+  runs.emit(run, ARENA_EVENT.verdict, { pass: verdict.pass, checks: verdict.checks, attempts: run.attempts })
 
   if (verdict.pass) {
     const evidence = await saveEvidence(run, verdict)
     await recordResult(evidence)
-    runs.emit(run, 'leaderboard-updated', {})
+    runs.emit(run, ARENA_EVENT.leaderboardUpdated, {})
     askMentor(run, praisePrompt({ challenge: run.challenge, durationMs: evidence.durationMs }))
   } else {
     askMentor(
@@ -157,9 +166,9 @@ app.post('/api/runs/:id/submit', async (req, res) => {
 app.post('/api/runs/:id/ask', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
-  const question = String(req.body?.question ?? '').slice(0, 2000)
+  const question = String(req.body?.question ?? '').slice(0, QUESTION_MAX_CHARS)
   if (!question.trim()) return res.status(400).json({ error: 'empty question' })
-  const prompt = run.status === 'live' ? liveQuestionPrompt(question) : followUpPrompt(question)
+  const prompt = run.status === RUN_STATUS.live ? liveQuestionPrompt(question) : followUpPrompt(question)
   const accepted = askMentor(run, prompt)
   res.status(accepted ? 202 : 429).json({ accepted })
 })
@@ -169,10 +178,17 @@ app.post('/api/runs/:id/ask', (req, res) => {
 app.post('/api/runs/:id/expire', async (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
-  if (run.status !== 'revealed') return res.status(409).json({ error: `run is ${run.status}` })
+  if (run.status !== RUN_STATUS.revealed) return res.status(409).json({ error: `run is ${run.status}` })
   const verdict = await runs.submit(run)
   const evidence = await saveEvidence(run, verdict)
   await recordResult(evidence)
-  runs.emit(run, 'leaderboard-updated', {})
+  runs.emit(run, ARENA_EVENT.leaderboardUpdated, {})
   res.json({ recorded: true })
+})
+
+// SPA fallback: deep links like /challenge/<slug> must serve the app shell.
+// express.static above already answered real files; anything else that is not
+// an API call falls through to index.html and the router takes over.
+app.get(/^\/(?!api\/).*/, (_req, res) => {
+  res.sendFile(join(root, 'dist', 'index.html'))
 })

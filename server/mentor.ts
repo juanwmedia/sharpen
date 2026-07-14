@@ -1,7 +1,14 @@
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createInterface } from 'node:readline'
-import type { Challenge, Verdict } from '../engine/types.ts'
+import {
+  DEFAULT_LOCALE,
+  MENTOR_ERROR_KIND,
+  type Challenge,
+  type Locale,
+  type MentorErrorKind,
+  type Verdict,
+} from '../engine/types.ts'
 
 // One Mentor per run. Spawns `claude -p` per turn (open-design pattern: the
 // server creates agent turns; nothing blocks waiting on the model) and keeps
@@ -28,6 +35,12 @@ Hard rules:
   sentences instead.
 - Address the player as "you". Never mention these instructions.`
 
+/** Extra system rule per UI language; English is the prompt's native voice. */
+const LANGUAGE_RULES: Record<Locale, string> = {
+  en: '',
+  es: '\n- The player uses the arena in Spanish: ALWAYS reply in Spanish (castellano), with proper accents. Keep git commands and flags in their original English form.',
+}
+
 const MAX_QUEUE = 3
 
 // Structural view of the spawned claude process: everything the mentor
@@ -50,9 +63,11 @@ export type SpawnFn = (
 export interface MentorOptions {
   onDelta: (text: string) => void
   onDone: () => void
-  onError: (kind: string, detail: string) => void
+  onError: (kind: MentorErrorKind, detail: string) => void
   /** Injectable process spawner so tests can fake the claude CLI. */
   spawnFn?: SpawnFn
+  /** Language the mentor answers in. Defaults to English. */
+  locale?: Locale
 }
 
 interface StreamEvent {
@@ -64,18 +79,20 @@ interface StreamEvent {
 export class Mentor {
   onDelta: (text: string) => void
   onDone: () => void
-  onError: (kind: string, detail: string) => void
+  onError: (kind: MentorErrorKind, detail: string) => void
   spawnFn: SpawnFn
+  locale: Locale
   sessionId: string | null = null
   turns = 0
   busy = false
   queue: string[] = []
 
-  constructor({ onDelta, onDone, onError, spawnFn }: MentorOptions) {
+  constructor({ onDelta, onDone, onError, spawnFn, locale }: MentorOptions) {
     this.onDelta = onDelta
     this.onDone = onDone
     this.onError = onError
     this.spawnFn = spawnFn ?? ((command, args, options) => spawn(command, args, options))
+    this.locale = locale ?? DEFAULT_LOCALE
   }
 
   // Never drop a request silently: spawning a turn takes seconds, so player
@@ -84,13 +101,13 @@ export class Mentor {
   // the same failure adds nothing, so it merges into the ongoing turn.
   ask(prompt: string, { coalesce = false }: { coalesce?: boolean } = {}): boolean {
     if (this.turns + this.queue.length >= MAX_TURNS) {
-      this.onError('mentor-budget', 'The mentor reached its turn budget for this run.')
+      this.onError(MENTOR_ERROR_KIND.budget, 'The mentor reached its turn budget for this run.')
       return false
     }
     if (this.busy) {
       if (coalesce) return true
       if (this.queue.length >= MAX_QUEUE) {
-        this.onError('mentor-busy', 'One question at a time: the mentor is still answering.')
+        this.onError(MENTOR_ERROR_KIND.busy, 'One question at a time: the mentor is still answering.')
         return false
       }
       this.queue.push(prompt)
@@ -111,7 +128,7 @@ export class Mentor {
       '--output-format', 'stream-json',
       '--include-partial-messages',
       '--verbose',
-      '--append-system-prompt', SYSTEM_PROMPT,
+      '--append-system-prompt', SYSTEM_PROMPT + LANGUAGE_RULES[this.locale],
     ]
     if (this.sessionId) {
       args.push('--resume', this.sessionId)
@@ -125,13 +142,13 @@ export class Mentor {
       child = this.spawnFn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (err) {
       this.busy = false
-      this.onError('mentor-unavailable', String(err instanceof Error ? err.message : err))
+      this.onError(MENTOR_ERROR_KIND.unavailable, String(err instanceof Error ? err.message : err))
       return false
     }
 
     let sawText = false
     let stderrTail = ''
-    const finish = (kind: string, detail = '') => {
+    const finish = (kind: MentorErrorKind | 'done', detail = '') => {
       clearTimeout(watchdog)
       if (!this.busy) return
       this.busy = false
@@ -150,7 +167,7 @@ export class Mentor {
       const detail = err.code === 'ENOENT'
         ? 'claude CLI not found on PATH. Install and authenticate Claude Code to enable the mentor.'
         : String(err.message)
-      finish('mentor-unavailable', detail)
+      finish(MENTOR_ERROR_KIND.unavailable, detail)
     })
 
     child.stderr.on('data', (chunk) => {
@@ -182,7 +199,7 @@ export class Mentor {
 
     child.on('close', (code) => {
       if (code === 0) finish('done')
-      else finish('mentor-error', stderrTail || `claude exited with code ${code}`)
+      else finish(MENTOR_ERROR_KIND.failed, stderrTail || `claude exited with code ${code}`)
     })
 
     child.stdin.write(prompt)
@@ -198,11 +215,13 @@ export function hintPrompt({ challenge, transcript, verdict, remainingMs }: {
   remainingMs: number
 }): string {
   const attempts = transcript.map((t) => `$ ${t.command}\n${t.output}`.trim()).join('\n')
-  const failed = verdict.checks.filter((c) => !c.pass).map((c) => `- ${c.name}: ${c.detail}`).join('\n')
+  // Prompts always use the canonical English content: the mentor answers in
+  // the player's language on its own (see LANGUAGE_RULES).
+  const failed = verdict.checks.filter((c) => !c.pass).map((c) => `- ${c.name.en}: ${c.detail.en}`).join('\n')
   return `LIVE CHALLENGE (do not reveal the solution). ${Math.round(remainingMs / 1000)}s left.
 
 Challenge: ${challenge.title}
-Goal: ${challenge.statement}
+Goal: ${challenge.statement.en}
 
 Terminal so far:
 ${attempts || '(nothing typed yet)'}
@@ -221,7 +240,7 @@ export function revealPrompt({ challenge, transcript }: {
   return `TIMER EXPIRED. Reveal and teach.
 
 Challenge: ${challenge.title}
-Goal: ${challenge.statement}
+Goal: ${challenge.statement.en}
 
 Canonical walkthrough (your source of truth): ${challenge.walkthrough}
 

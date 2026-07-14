@@ -12,7 +12,12 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
-    "jsx": "preserve"
+    "jsx": "preserve",
+    "paths": {
+      "@engine/*": ["./engine/*"],
+      "@challenges/*": ["./challenges/*"],
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*", "engine/**/*", "server/**/*", "challenges/**/*", "test/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]

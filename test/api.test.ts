@@ -34,7 +34,9 @@ describe('sharpen API', () => {
       difficulty: 'medium',
       timeLimitMs: 60_000,
     })
-    expect(typeof first!.statement).toBe('string')
+    // Challenge content is bilingual: authors write every language.
+    expect(typeof (first!.statement as Record<string, unknown>).en).toBe('string')
+    expect(typeof (first!.statement as Record<string, unknown>).es).toBe('string')
     expect(first!.focusCommands).toEqual(['git status', 'git clean'])
     // Summaries must not leak the solution or the executable hooks.
     expect(first).not.toHaveProperty('walkthrough')
@@ -57,9 +59,11 @@ describe('sharpen API', () => {
     const checks = submit.body.checks as Check[]
     expect(checks).toHaveLength(4)
     for (const check of checks) {
-      expect(typeof check.name).toBe('string')
+      expect(typeof check.name.en).toBe('string')
+      expect(typeof check.name.es).toBe('string')
       expect(typeof check.pass).toBe('boolean')
-      expect(typeof check.detail).toBe('string')
+      expect(typeof check.detail.en).toBe('string')
+      expect(typeof check.detail.es).toBe('string')
     }
   })
 

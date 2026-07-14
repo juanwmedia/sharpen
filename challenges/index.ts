@@ -1,4 +1,5 @@
 import cleanSweep from './git/clean-sweep.ts'
+import { slugify } from './slug.ts'
 import type { Challenge, ChallengeSummary } from '../engine/types.ts'
 
 // Single registry consumed by the web bundle (setup + local execution) and the
@@ -7,6 +8,10 @@ export const challenges: Challenge[] = [cleanSweep]
 
 export function getChallenge(id: string): Challenge | undefined {
   return challenges.find((c) => c.id === id)
+}
+
+export function getChallengeBySlug(slug: string): Challenge | undefined {
+  return challenges.find((c) => slugify(c.title) === slug)
 }
 
 export function challengeSummaries(): ChallengeSummary[] {

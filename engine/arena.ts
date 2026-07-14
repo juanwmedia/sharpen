@@ -5,6 +5,7 @@ import { createGitFs } from './fs-bridge.ts'
 import { createGitCommand } from './porcelain/git-command.ts'
 import { dirname, join } from './paths.ts'
 import { takeSnapshot, stateHash } from './snapshot.ts'
+import { ARENA_DEFAULT_BRANCH } from './types.ts'
 import type { Arena, Challenge, ChallengeSetupEnv } from './types.ts'
 
 export const REPO_DIR = '/repo'
@@ -29,7 +30,7 @@ export async function createArena(challenge: Challenge): Promise<Arena> {
   const clock = () => ({ timestamp: BASE_TIMESTAMP + tick++ * 60, timezoneOffset: 0 })
 
   await jbFs.mkdir(dir, { recursive: true })
-  await git.init({ fs, dir, defaultBranch: 'main' })
+  await git.init({ fs, dir, defaultBranch: ARENA_DEFAULT_BRANCH })
 
   const setup: ChallengeSetupEnv = {
     fs: jbFs,

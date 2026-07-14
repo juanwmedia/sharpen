@@ -15,7 +15,8 @@ dependency upgrades.
   directory, so callers track `cd` by reading `result.env.PWD` after each exec.
   The upstream `@wterm/just-bash` shell instead RE-RUNS the whole command with
   output discarded to probe `pwd` (double side effects on `git commit`!): that
-  is why we vendor the shell in `web/src/vendor/` and use `env.PWD`.
+  is why we vendor the shell in `src/shared/lib/bash-shell.ts` and use
+  `env.PWD`.
 - `IFileSystem` (dist/fs/interface.d.ts): readFile/readFileBuffer/writeFile/
   appendFile/exists/stat/lstat/mkdir/readdir/rm(recursive,force)/cp/mv/
   symlink/readlink/chmod/utimes/resolvePath/getAllPaths. There is no
@@ -43,7 +44,16 @@ dependency upgrades.
   `wasmUrl` and no asset copying is needed; esbuild bundles everything.
 - `@wterm/just-bash`'s `BashShell` is NOT used directly (no way to inject fs or
   custom commands, plus the double-exec bug). Vendored + adapted under
-  Apache-2.0 in `web/src/vendor/bash-shell.js`.
+  Apache-2.0 in `src/shared/lib/bash-shell.ts`.
+
+## vue-i18n 11 (intlify message format)
+
+- `@` and `|` are SPECIAL inside messages: a bare `@` starts a linked message
+  and `|` splits plural forms. The offending message compiles lazily and
+  throws `SyntaxError` at first render, which unmounts the whole component
+  subtree (this silently killed TerminalPane via `you@sharpen`). Escape as
+  `{'@'}` / `{'|'}`. Guarded by test/i18n.test.ts, which compiles every
+  message of every locale with the real compiler.
 
 ## claude CLI (headless mentor)
 

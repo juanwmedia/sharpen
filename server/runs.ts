@@ -2,12 +2,28 @@ import { randomUUID } from 'node:crypto'
 import type { Response } from 'express'
 import { createArena } from '../engine/arena.ts'
 import { getChallenge } from '../challenges/index.ts'
-import type { Challenge, Verdict } from '../engine/types.ts'
+import {
+  ARENA_EVENT,
+  DEFAULT_LOCALE,
+  type ArenaEventName,
+  type Challenge,
+  type Locale,
+  type Verdict,
+} from '../engine/types.ts'
 import type { Mentor } from './mentor.ts'
 
 const HEARTBEAT_MS = 15_000
+const RUN_ID_CHARS = 8
+/** Cap on stored per-command output: it feeds mentor prompts and evidence. */
+const TRANSCRIPT_OUTPUT_MAX_CHARS = 4000
 
-export type RunStatus = 'ready' | 'live' | 'passed' | 'revealed'
+export const RUN_STATUS = {
+  ready: 'ready',
+  live: 'live',
+  passed: 'passed',
+  revealed: 'revealed',
+} as const
+export type RunStatus = (typeof RUN_STATUS)[keyof typeof RUN_STATUS]
 
 export interface TranscriptEntry {
   command: string
@@ -19,6 +35,8 @@ export interface Run {
   challengeId: string
   challenge: Challenge
   player: string
+  /** UI language of the player; the mentor answers in it. */
+  locale: Locale
   status: RunStatus
   transcript: TranscriptEntry[]
   attempts: number
@@ -37,15 +55,16 @@ export interface Run {
 export class RunStore {
   runs = new Map<string, Run>()
 
-  create({ challengeId, player }: { challengeId: string; player: string }): Run | null {
+  create({ challengeId, player, locale }: { challengeId: string; player: string; locale?: Locale }): Run | null {
     const challenge = getChallenge(challengeId)
     if (!challenge) return null
     const run: Run = {
-      id: randomUUID().slice(0, 8),
+      id: randomUUID().slice(0, RUN_ID_CHARS),
       challengeId,
       challenge,
       player,
-      status: 'ready', // ready -> live -> passed | revealed
+      locale: locale ?? DEFAULT_LOCALE,
+      status: RUN_STATUS.ready, // ready -> live -> passed | revealed
       transcript: [],
       attempts: 0,
       startedAt: null,
@@ -78,28 +97,28 @@ export class RunStore {
     })
   }
 
-  emit(run: Run, event: string, data: unknown = {}): void {
+  emit(run: Run, event: ArenaEventName, data: unknown = {}): void {
     const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
     for (const client of run.clients) client.write(frame)
   }
 
   start(run: Run, onTimeout: (run: Run) => void): Run {
-    if (run.status !== 'ready') return run
-    run.status = 'live'
+    if (run.status !== RUN_STATUS.ready) return run
+    run.status = RUN_STATUS.live
     run.startedAt = Date.now()
     run.deadline = run.startedAt + run.challenge.timeLimitMs
     run.timer = setTimeout(() => {
-      if (run.status === 'live') {
-        run.status = 'revealed'
+      if (run.status === RUN_STATUS.live) {
+        run.status = RUN_STATUS.revealed
         onTimeout(run)
       }
     }, run.challenge.timeLimitMs)
-    this.emit(run, 'started', { startedAt: run.startedAt, deadline: run.deadline })
+    this.emit(run, ARENA_EVENT.started, { startedAt: run.startedAt, deadline: run.deadline })
     return run
   }
 
   recordCommand(run: Run, command: string, output: unknown): void {
-    run.transcript.push({ command, output: String(output ?? '').slice(0, 4000) })
+    run.transcript.push({ command, output: String(output ?? '').slice(0, TRANSCRIPT_OUTPUT_MAX_CHARS) })
   }
 
   // Authoritative verdict: fresh arena + transcript replay. Deterministic by
@@ -111,9 +130,9 @@ export class RunStore {
       await arena.exec(command)
     }
     const verdict = await arena.verdict()
-    if (verdict.pass && run.status === 'live') {
+    if (verdict.pass && run.status === RUN_STATUS.live) {
       clearTimeout(run.timer ?? undefined)
-      run.status = 'passed'
+      run.status = RUN_STATUS.passed
     }
     return verdict
   }
