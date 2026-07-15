@@ -31,6 +31,7 @@ export const TIMER_DANGER_MS = 10_000
 export const DEFAULT_TIME_LIMIT_MS = 60_000
 
 export const LOCALE_STORAGE_KEY = 'sharpen.locale'
+export const RUN_MODE_STORAGE_KEY = 'sharpen.runMode'
 
 /** Prompt label when the repo is not on any branch (detached HEAD). */
 export const DETACHED_HEAD_LABEL = 'HEAD'

@@ -12,7 +12,7 @@ const { t } = useI18n()
   <div class="panel">
     <Eyebrow>{{ t('verdict.eyebrow') }}</Eyebrow>
     <ul class="m-0 grid list-none gap-2 p-0">
-      <li v-if="!checks" class="text-[13px] text-faint">{{ t('verdict.pending') }}</li>
+      <li v-if="checks === null" class="text-[13px] text-faint">{{ t('verdict.loading') }}</li>
       <li
         v-for="check in checks ?? []"
         :key="check.name.en"

@@ -25,7 +25,11 @@ function enterArena(title: string): void {
     <section>
       <Eyebrow>{{ t('picker.eyebrow') }}</Eyebrow>
       <h1 class="mb-3 font-mono text-[clamp(28px,4vw,40px)] tracking-[-0.03em]">{{ t('picker.title') }}</h1>
-      <i18n-t keypath="picker.lede" tag="p" class="max-w-[58ch] text-muted">
+      <i18n-t
+        :keypath="state.mode === 'challenge' ? 'picker.ledeChallenge' : 'picker.ledeLearn'"
+        tag="p"
+        class="max-w-[58ch] text-muted"
+      >
         <template #enter><kbd>Enter</kbd></template>
       </i18n-t>
       <div class="mt-7 grid gap-3.5">

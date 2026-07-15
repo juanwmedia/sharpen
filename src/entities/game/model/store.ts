@@ -3,8 +3,23 @@ import type { FsClient } from 'isomorphic-git'
 import type { ExecResult } from 'just-bash'
 import { getChallenge } from '@challenges/index.ts'
 import { createArena } from '@engine/arena.ts'
-import { ARENA_DEFAULT_BRANCH, ARENA_EVENT, MENTOR_ERROR_KIND } from '@engine/types.ts'
-import type { Arena, Check, ChallengeSummary, LeaderboardRow, MentorErrorKind } from '@engine/types.ts'
+import {
+  ARENA_DEFAULT_BRANCH,
+  ARENA_EVENT,
+  DEFAULT_RUN_MODE,
+  MENTOR_BUBBLE,
+  MENTOR_ERROR_KIND,
+  RUN_MODES,
+} from '@engine/types.ts'
+import type {
+  Arena,
+  Check,
+  ChallengeSummary,
+  LeaderboardRow,
+  MentorBubble,
+  MentorErrorKind,
+  RunMode,
+} from '@engine/types.ts'
 import { apiRoutes, getJson, postJson } from '@/shared/api/index.ts'
 import {
   COMMAND_OUTPUT_MAX_CHARS,
@@ -13,18 +28,30 @@ import {
   DEFAULT_TIME_LIMIT_MS,
   DETACHED_HEAD_LABEL,
   RUN_LOST_REDIRECT_MS,
+  RUN_MODE_STORAGE_KEY,
   SHELL_COMMANDS,
 } from '@/shared/config/index.ts'
 import { currentLocale, t } from '@/shared/i18n/index.ts'
 import { ansi, CRLF } from '@/shared/lib/ansi.ts'
 import { MENTOR_ROLE, RUN_STATUS } from './types.ts'
-import type { GameState, MentorItem } from './types.ts'
+import type { GameState, MentorItem, MentorRole } from './types.ts'
+
+function storedRunMode(): RunMode {
+  try {
+    const value = localStorage.getItem(RUN_MODE_STORAGE_KEY)
+    if (value && (RUN_MODES as readonly string[]).includes(value)) return value as RunMode
+  } catch {
+    /* storage unavailable: fall through */
+  }
+  return DEFAULT_RUN_MODE
+}
 
 const state = reactive<GameState>({
   player: '',
   engineVersion: '',
   challenges: [],
   leaderboard: [],
+  mode: storedRunMode(),
   challenge: null,
   runId: null,
   status: RUN_STATUS.idle,
@@ -47,6 +74,8 @@ let runLostHandler: () => void = () => {}
 let shellTipShown = false
 // Each mentor turn gets its own bubble; deltas within a turn append.
 let mentorNewTurn = true
+/** Role for the mentor turn currently streaming (set from the first delta). */
+let mentorTurnRole: MentorRole = MENTOR_ROLE.mentor
 
 /** Server error kinds mapped to localized bubbles (see server/mentor.ts). */
 const MENTOR_ERROR_KEYS: Record<MentorErrorKind, string> = {
@@ -64,6 +93,15 @@ export function registerRunLostHandler(handler: () => void): void {
   runLostHandler = handler
 }
 
+function setRunMode(mode: RunMode): void {
+  state.mode = mode
+  try {
+    localStorage.setItem(RUN_MODE_STORAGE_KEY, mode)
+  } catch {
+    /* storage unavailable: the choice just does not persist */
+  }
+}
+
 async function boot(): Promise<void> {
   const meta = await getJson<{ player: string; engineVersion: string }>(apiRoutes.meta)
   state.player = meta.player
@@ -79,17 +117,17 @@ async function startRun(challengeId: string): Promise<void> {
   const challenge = getChallenge(challengeId)
   if (!challenge) return
 
-  // The locale rides along so the mentor answers in the player's language.
+  // Locale + mode ride along so the server steers timer and mentor language.
   const { runId } = await postJson<{ runId: string }>(apiRoutes.runs, {
     challengeId,
     locale: currentLocale(),
+    mode: state.mode,
   })
 
   // markRaw: a Challenge carries setup/assert functions; proxying it deeply
   // would be pure overhead (and reactivity on it is never needed).
   state.challenge = markRaw(challenge)
   state.runId = runId
-  state.status = RUN_STATUS.countdown
   state.branch = ARENA_DEFAULT_BRANCH
   state.checks = null
   state.mentorFeed = []
@@ -99,15 +137,26 @@ async function startRun(challengeId: string): Promise<void> {
   arena = await createArena(challenge)
   connectEvents(runId)
 
-  for (const step of COUNTDOWN_STEPS) {
-    state.countdownNum = step
-    await new Promise((resolve) => setTimeout(resolve, COUNTDOWN_STEP_MS))
+  if (state.mode === 'challenge') {
+    state.status = RUN_STATUS.countdown
+    for (const step of COUNTDOWN_STEPS) {
+      state.countdownNum = step
+      await new Promise((resolve) => setTimeout(resolve, COUNTDOWN_STEP_MS))
+    }
+    state.countdownNum = null
   }
-  state.countdownNum = null
 
-  const started = await postJson<{ deadline: number }>(apiRoutes.runStart(runId))
+  const started = await postJson<{ deadline: number | null }>(apiRoutes.runStart(runId))
   state.status = RUN_STATUS.live
-  state.deadline = started.deadline
+  state.deadline = started.deadline ?? 0
+  await refreshChecks()
+}
+
+/** Rubric from the local arena: same assert() as the server, no submit side effects. */
+async function refreshChecks(): Promise<void> {
+  if (!arena) return
+  const verdict = await arena.verdict()
+  state.checks = verdict.checks
 }
 
 // Called when the arena page unmounts (back button, browser back, run lost):
@@ -117,6 +166,14 @@ function leaveRun(): void {
   events = null
   state.status = RUN_STATUS.idle
   state.runId = null
+}
+
+async function revealSolution(): Promise<void> {
+  if (state.mode !== 'learn' || state.status !== RUN_STATUS.live || !state.runId) return
+  const res = await fetch(apiRoutes.runReveal(state.runId), { method: 'POST' })
+  if (!res.ok) return
+  state.status = RUN_STATUS.revealed
+  termWrite(ansi.yellow(t('terminal.revealed')) + CRLF)
 }
 
 // ---------- terminal integration -------------------------------------------
@@ -244,6 +301,10 @@ function pushMentorError(kind: string, detail: string): void {
   state.mentorBusy = false
 }
 
+function bubbleToRole(bubble?: MentorBubble): MentorRole {
+  return bubble === MENTOR_BUBBLE.reveal ? MENTOR_ROLE.reveal : MENTOR_ROLE.mentor
+}
+
 function connectEvents(runId: string): void {
   events?.close()
   events = new EventSource(apiRoutes.runEvents(runId))
@@ -265,6 +326,7 @@ function connectEvents(runId: string): void {
     state.checks = data.checks
   })
   events.addEventListener(ARENA_EVENT.timeout, () => {
+    if (state.mode === 'learn') return
     state.status = RUN_STATUS.revealed
     const seconds = Math.round((state.challenge?.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS) / 1000)
     termWrite(ansi.yellow(t('terminal.timeout', { seconds })) + CRLF)
@@ -277,13 +339,18 @@ function connectEvents(runId: string): void {
     }
   })
   events.addEventListener(ARENA_EVENT.mentorDelta, (e) => {
-    const { text } = JSON.parse((e as MessageEvent).data) as { text: string }
+    const { text, bubble } = JSON.parse((e as MessageEvent).data) as {
+      text: string
+      bubble?: MentorBubble
+    }
     state.mentorFeed = state.mentorFeed.filter((m) => m.role !== MENTOR_ROLE.thinking)
+    const role = bubbleToRole(bubble)
     const last = state.mentorFeed[state.mentorFeed.length - 1]
-    if (!mentorNewTurn && last && last.role === MENTOR_ROLE.mentor) {
+    if (!mentorNewTurn && last && last.role === mentorTurnRole) {
       last.text += text
     } else {
-      state.mentorFeed.push({ role: MENTOR_ROLE.mentor, text })
+      mentorTurnRole = role
+      state.mentorFeed.push({ role, text })
       mentorNewTurn = false
     }
   })
@@ -307,5 +374,14 @@ function runLost(): void {
 }
 
 export function useGame() {
-  return { state: readonly(state), boot, startRun, leaveRun, askMentor, refreshLeaderboard }
+  return {
+    state: readonly(state),
+    boot,
+    startRun,
+    leaveRun,
+    askMentor,
+    refreshLeaderboard,
+    setRunMode,
+    revealSolution,
+  }
 }

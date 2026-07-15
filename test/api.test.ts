@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
@@ -8,16 +8,18 @@ import type { Check } from '../engine/types.ts'
 // Both env vars must be set BEFORE the app module loads: store.ts resolves
 // SHARPEN_DATA_DIR at import time, and SHARPEN_NO_MENTOR keeps submit from
 // spawning the real claude CLI (see askMentor in server/app.ts).
-process.env.SHARPEN_DATA_DIR = mkdtempSync(join(tmpdir(), 'sharpen-api-test-'))
+const dataDir = mkdtempSync(join(tmpdir(), 'sharpen-api-test-'))
+process.env.SHARPEN_DATA_DIR = dataDir
 process.env.SHARPEN_NO_MENTOR = '1'
 
 const { app } = await import('../server/app.ts')
 
-async function createRun(): Promise<string> {
+async function createRun(mode?: 'learn' | 'challenge'): Promise<string> {
   const res = await request(app)
     .post('/api/runs')
-    .send({ challengeId: 'git/clean-sweep', player: 'tester' })
+    .send({ challengeId: 'git/clean-sweep', player: 'tester', ...(mode ? { mode } : {}) })
   expect(res.status).toBe(200)
+  if (mode) expect(res.body.mode).toBe(mode)
   return res.body.runId as string
 }
 
@@ -44,13 +46,27 @@ describe('sharpen API', () => {
     expect(first).not.toHaveProperty('assert')
   })
 
-  it('create -> start -> submit returns an authoritative verdict with 4 checks', async () => {
+  it('defaults to learn mode: start has no deadline', async () => {
     const runId = await createRun()
+    const start = await request(app).post(`/api/runs/${runId}/start`)
+    expect(start.status).toBe(200)
+    expect(typeof start.body.startedAt).toBe('number')
+    expect(start.body.deadline).toBeNull()
+    expect(start.body.mode).toBe('learn')
+  })
 
+  it('challenge mode start sets a deadline from the challenge time limit', async () => {
+    const runId = await createRun('challenge')
     const start = await request(app).post(`/api/runs/${runId}/start`)
     expect(start.status).toBe(200)
     expect(typeof start.body.startedAt).toBe('number')
     expect(start.body.deadline).toBe(start.body.startedAt + 60_000)
+    expect(start.body.mode).toBe('challenge')
+  })
+
+  it('create -> start -> submit returns an authoritative verdict with 4 checks', async () => {
+    const runId = await createRun('learn')
+    await request(app).post(`/api/runs/${runId}/start`)
 
     // Empty transcript: the replay produces the initial (dirty) state.
     const submit = await request(app).post(`/api/runs/${runId}/submit`)
@@ -65,6 +81,49 @@ describe('sharpen API', () => {
       expect(typeof check.detail.en).toBe('string')
       expect(typeof check.detail.es).toBe('string')
     }
+  })
+
+  it('learn reveal returns 204 and rejects a second reveal', async () => {
+    const runId = await createRun('learn')
+    await request(app).post(`/api/runs/${runId}/start`)
+    const reveal = await request(app).post(`/api/runs/${runId}/reveal`)
+    expect(reveal.status).toBe(204)
+    const again = await request(app).post(`/api/runs/${runId}/reveal`)
+    expect(again.status).toBe(409)
+  })
+
+  it('challenge mode rejects voluntary reveal', async () => {
+    const runId = await createRun('challenge')
+    await request(app).post(`/api/runs/${runId}/start`)
+    const reveal = await request(app).post(`/api/runs/${runId}/reveal`)
+    expect(reveal.status).toBe(409)
+  })
+
+  it('learn pass does not write leaderboard entries', async () => {
+    const runId = await createRun('learn')
+    await request(app).post(`/api/runs/${runId}/start`)
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'git clean -fd', output: '' })
+    const submit = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(submit.status).toBe(200)
+    expect(submit.body.pass).toBe(true)
+    expect(existsSync(join(dataDir, 'leaderboard.json'))).toBe(false)
+  })
+
+  it('challenge pass records a leaderboard entry', async () => {
+    const runId = await createRun('challenge')
+    await request(app).post(`/api/runs/${runId}/start`)
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'git clean -fd', output: '' })
+    const submit = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(submit.status).toBe(200)
+    expect(submit.body.pass).toBe(true)
+    const board = JSON.parse(readFileSync(join(dataDir, 'leaderboard.json'), 'utf8')) as {
+      entries: Array<{ runId: string; pass: boolean }>
+    }
+    expect(board.entries.some((e) => e.runId === runId && e.pass)).toBe(true)
   })
 
   it('returns 404 for an unknown run', async () => {

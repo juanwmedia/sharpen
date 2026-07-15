@@ -1,4 +1,4 @@
-import type { Challenge, ChallengeSummary, Check, LeaderboardRow } from '@engine/types.ts'
+import type { Challenge, ChallengeSummary, Check, LeaderboardRow, RunMode } from '@engine/types.ts'
 
 /** Client-side run lifecycle. Distinct from the server's (it adds the
  * pre-network idle/countdown phases). */
@@ -14,6 +14,7 @@ export type RunStatus = (typeof RUN_STATUS)[keyof typeof RUN_STATUS]
 /** Who speaks in a conversation bubble. */
 export const MENTOR_ROLE = {
   mentor: 'mentor',
+  reveal: 'reveal',
   you: 'you',
   youCmd: 'you-cmd',
   system: 'system',
@@ -33,6 +34,8 @@ export interface GameState {
   engineVersion: string
   challenges: ChallengeSummary[]
   leaderboard: LeaderboardRow[]
+  /** Preferred mode for the next run; persisted in localStorage. */
+  mode: RunMode
   challenge: Challenge | null
   runId: string | null
   status: RunStatus

@@ -12,6 +12,7 @@ export const apiRoutes = {
   runCommand: (id: string) => `/api/runs/${id}/command`,
   runSubmit: (id: string) => `/api/runs/${id}/submit`,
   runAsk: (id: string) => `/api/runs/${id}/ask`,
+  runReveal: (id: string) => `/api/runs/${id}/reveal`,
   runExpire: (id: string) => `/api/runs/${id}/expire`,
 } as const
 

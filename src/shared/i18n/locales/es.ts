@@ -7,10 +7,18 @@ export default {
   lang: {
     label: 'Idioma',
   },
+  mode: {
+    label: 'Modo de juego',
+    learn: 'aprender',
+    challenge: 'desafío',
+  },
   picker: {
     eyebrow: 'pack de git',
     title: 'Elige tu desafío',
-    lede: '60 segundos en el reloj, un repo real en tu navegador y un mentor socrático observando. Cada {enter} valida: ejecuta un comando y la arena juzga el estado del repo que deja detrás. Cualquier solución correcta pasa.',
+    ledeLearn:
+      'Sin reloj, un repo real en tu navegador y un mentor socrático observando. Cada {enter} valida: ejecuta un comando y la arena juzga el estado del repo que deja detrás. Desvela la solución cuando quieras el walkthrough.',
+    ledeChallenge:
+      '60 segundos en el reloj, un repo real en tu navegador y un mentor socrático observando. Cada {enter} valida: ejecuta un comando y la arena juzga el estado del repo que deja detrás. Cualquier solución correcta pasa.',
     meta: '{pack} · {difficulty} · {seconds}s',
     enterArena: '→ entra en la arena',
   },
@@ -38,19 +46,20 @@ export default {
     hint: 'cada {enter} valida',
     pin: 'Fijar el terminal (siempre visible)',
     unpin: 'Soltar el terminal (se desplaza con la página)',
-    greetingTagline: 'El repo es real. El reloj no es tu amigo. Cada Enter valida.',
+    greetingTagline: 'El repo es real. Cada Enter valida.',
     shellTip: 'Esto es la shell, no el mentor. Pregunta al mentor en la conversación de abajo; cada Enter valida el estado de tu repo.',
     solved: '✓ Desafío resuelto. La arena validó el estado de tu repo.',
     notYetQuiet: '✗ todavía no: {green}/{total} checks en verde',
     notYetLoud: '✗ Todavía no. Mira el panel de veredicto. El mentor tiene una pista.',
     alreadySolved: 'Ya está resuelto. Pregunta al mentor abajo o vuelve a por el siguiente desafío.',
-    timeUp: 'Se acabó el tiempo. El mentor está enseñando. Puedes seguir experimentando.',
+    timeUp: 'Solución desvelada. El mentor está enseñando. Puedes seguir experimentando.',
     timeout: '⏱ Los {seconds} segundos se han ido. El mentor llega ahora, y puedes seguir tecleando.',
+    revealed: 'Solución desvelada. El mentor está enseñando. Puedes seguir experimentando.',
     runLost: 'El servidor de la arena se reinició y este intento se ha perdido. Te llevo de vuelta a los desafíos…',
   },
   chat: {
     eyebrow: 'conversación',
-    idle: 'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras corre el reloj el mentor solo da empujones, nunca destripa; cuando termina, enseña.',
+    idle: 'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña.',
     placeholderLive: 'Pide un empujón…',
     placeholderFree: 'Pregunta lo que quieras al mentor…',
     send: 'Enviar',
@@ -69,9 +78,23 @@ export default {
     solved: 'resuelto',
     timeout: 'tiempo agotado',
   },
+  learn: {
+    eyebrow: 'modo aprender',
+    ready: 'listo',
+    practicing: 'practicando',
+    solved: 'resuelto',
+    revealed: 'desvelado',
+    reveal: 'Desvelar solución',
+  },
+  revealModal: {
+    title: '¿Desvelar la solución?',
+    body: 'El mentor te explicará el enfoque canónico. Puedes seguir tecleando después, pero se acaba el guardrail socrático.',
+    confirm: 'Desvelar',
+    cancel: 'Seguir intentando',
+  },
   verdict: {
     eyebrow: 'veredicto',
-    pending: 'Valida para ver los checks.',
+    loading: 'Cargando checks…',
   },
   player: {
     profileTitle: 'Abrir el perfil de GitHub de {player}',

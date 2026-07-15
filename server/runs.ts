@@ -5,9 +5,13 @@ import { getChallenge } from '../challenges/index.ts'
 import {
   ARENA_EVENT,
   DEFAULT_LOCALE,
+  DEFAULT_RUN_MODE,
+  MENTOR_BUBBLE,
   type ArenaEventName,
   type Challenge,
   type Locale,
+  type MentorBubble,
+  type RunMode,
   type Verdict,
 } from '../engine/types.ts'
 import type { Mentor } from './mentor.ts'
@@ -37,6 +41,8 @@ export interface Run {
   player: string
   /** UI language of the player; the mentor answers in it. */
   locale: Locale
+  /** Learn: no timer, no local ranking. Challenge: timed + evidence. */
+  mode: RunMode
   status: RunStatus
   transcript: TranscriptEntry[]
   attempts: number
@@ -45,6 +51,8 @@ export interface Run {
   timer: NodeJS.Timeout | null
   clients: Set<Response>
   mentor: Mentor | null
+  /** Bubble kind for the mentor turn currently streaming (or next ask). */
+  mentorBubble: MentorBubble
 }
 
 // In-memory run registry. One run = one attempt at one challenge by the local
@@ -55,7 +63,17 @@ export interface Run {
 export class RunStore {
   runs = new Map<string, Run>()
 
-  create({ challengeId, player, locale }: { challengeId: string; player: string; locale?: Locale }): Run | null {
+  create({
+    challengeId,
+    player,
+    locale,
+    mode,
+  }: {
+    challengeId: string
+    player: string
+    locale?: Locale
+    mode?: RunMode
+  }): Run | null {
     const challenge = getChallenge(challengeId)
     if (!challenge) return null
     const run: Run = {
@@ -64,6 +82,7 @@ export class RunStore {
       challenge,
       player,
       locale: locale ?? DEFAULT_LOCALE,
+      mode: mode ?? DEFAULT_RUN_MODE,
       status: RUN_STATUS.ready, // ready -> live -> passed | revealed
       transcript: [],
       attempts: 0,
@@ -72,6 +91,7 @@ export class RunStore {
       timer: null,
       clients: new Set(),
       mentor: null,
+      mentorBubble: MENTOR_BUBBLE.mentor,
     }
     this.runs.set(run.id, run)
     return run
@@ -106,15 +126,25 @@ export class RunStore {
     if (run.status !== RUN_STATUS.ready) return run
     run.status = RUN_STATUS.live
     run.startedAt = Date.now()
-    run.deadline = run.startedAt + run.challenge.timeLimitMs
-    run.timer = setTimeout(() => {
-      if (run.status === RUN_STATUS.live) {
-        run.status = RUN_STATUS.revealed
-        onTimeout(run)
-      }
-    }, run.challenge.timeLimitMs)
+    if (run.mode === 'challenge') {
+      run.deadline = run.startedAt + run.challenge.timeLimitMs
+      run.timer = setTimeout(() => {
+        if (run.status === RUN_STATUS.live) {
+          run.status = RUN_STATUS.revealed
+          onTimeout(run)
+        }
+      }, run.challenge.timeLimitMs)
+    }
     this.emit(run, ARENA_EVENT.started, { startedAt: run.startedAt, deadline: run.deadline })
     return run
+  }
+
+  /** Learn-mode voluntary reveal: same mentor teach path as challenge timeout,
+   * without evidence or leaderboard side effects. */
+  reveal(run: Run): boolean {
+    if (run.mode !== 'learn' || run.status !== RUN_STATUS.live) return false
+    run.status = RUN_STATUS.revealed
+    return true
   }
 
   recordCommand(run: Run, command: string, output: unknown): void {

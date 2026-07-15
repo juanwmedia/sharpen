@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getChallengeBySlug } from '@challenges/index.ts'
 import { registerRunLostHandler, useGame } from '@/entities/game/index.ts'
 import { Chip } from '@/shared/ui/index.ts'
+import { LearnPanel } from '@/widgets/learn-panel/index.ts'
 import { MentorChat } from '@/widgets/mentor-chat/index.ts'
 import { TerminalPane } from '@/widgets/terminal-pane/index.ts'
 import { TimerRing } from '@/widgets/run-timer/index.ts'
@@ -15,7 +16,7 @@ import { lt } from '@/shared/i18n/index.ts'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const { state, startRun, leaveRun, askMentor } = useGame()
+const { state, startRun, leaveRun, askMentor, revealSolution } = useGame()
 
 // The URL owns the challenge: /challenge/<slug> starts a fresh run on entry,
 // and an unknown slug goes home instead of showing an empty arena.
@@ -79,10 +80,17 @@ const terminalPinned = ref(true)
 
     <aside class="grid content-start gap-4">
       <TimerRing
+        v-if="state.mode === 'challenge'"
         :status="state.status"
         :deadline="state.deadline"
         :total-ms="state.challenge?.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS"
         :not-yet="notYet"
+      />
+      <LearnPanel
+        v-else
+        :status="state.status"
+        :mentor-busy="state.mentorBusy"
+        @reveal="revealSolution"
       />
       <VerdictPanel :checks="state.checks" />
     </aside>

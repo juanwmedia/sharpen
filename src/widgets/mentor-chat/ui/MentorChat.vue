@@ -19,6 +19,8 @@ const feedEl = ref<HTMLElement | null>(null)
 
 const BUBBLE_CLASS: Record<MentorRole, string> = {
   [MENTOR_ROLE.mentor]: 'border border-line bg-surface-2 rounded-bl-[5px]',
+  [MENTOR_ROLE.reveal]:
+    'border border-[color-mix(in_srgb,var(--color-ok)_40%,var(--color-line))] bg-[color-mix(in_srgb,var(--color-ok)_12%,var(--color-surface-2))] rounded-bl-[5px]',
   [MENTOR_ROLE.you]:
     'border border-[color-mix(in_srgb,var(--color-accent)_35%,var(--color-line))] bg-[color-mix(in_srgb,var(--color-accent)_16%,var(--color-surface-2))] rounded-br-[5px]',
   [MENTOR_ROLE.youCmd]:

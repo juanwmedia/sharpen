@@ -11,6 +11,19 @@ export const LOCALES = ['en', 'es'] as const
 export type Locale = (typeof LOCALES)[number]
 export const DEFAULT_LOCALE: Locale = 'en'
 
+/** How a run is scored and timed. Learn: no timer, no local ranking.
+ * Challenge: countdown + timer, local evidence on pass/timeout. */
+export const RUN_MODES = ['learn', 'challenge'] as const
+export type RunMode = (typeof RUN_MODES)[number]
+export const DEFAULT_RUN_MODE: RunMode = 'learn'
+
+/** Mentor bubble kind on mentor-delta SSE; omit for the default mentor style. */
+export const MENTOR_BUBBLE = {
+  mentor: 'mentor',
+  reveal: 'reveal',
+} as const
+export type MentorBubble = (typeof MENTOR_BUBBLE)[keyof typeof MENTOR_BUBBLE]
+
 /** Branch every arena repo is initialized on; challenges may assume it. */
 export const ARENA_DEFAULT_BRANCH = 'main'
 
@@ -70,8 +83,8 @@ export interface Challenge {
   statement: Localized
   /** Commands surfaced in the UI and in mentor prompts. */
   focusCommands: string[]
-  /** Canonical solution, only revealed by the mentor after timeout. English
-   * only: it feeds the mentor, which answers in the player's language. */
+  /** Canonical solution, revealed by the mentor after timeout (challenge) or
+   * voluntary reveal (learn). English only: it feeds the mentor. */
   walkthrough: string
   setup(env: ChallengeSetupEnv): Promise<void>
   assert(ctx: ChallengeAssertContext): Promise<{ pass: boolean; checks: Check[] }>
@@ -152,11 +165,11 @@ export type MentorErrorKind = (typeof MENTOR_ERROR_KIND)[keyof typeof MENTOR_ERR
 
 /** SSE events the server pushes to the arena page. */
 export type ArenaEvent =
-  | { type: typeof ARENA_EVENT.started; startedAt: number; deadline: number }
+  | { type: typeof ARENA_EVENT.started; startedAt: number; deadline: number | null }
   | { type: typeof ARENA_EVENT.verdict; pass: boolean; checks: Check[]; attempts: number }
   | { type: typeof ARENA_EVENT.timeout }
   | { type: typeof ARENA_EVENT.mentorThinking }
-  | { type: typeof ARENA_EVENT.mentorDelta; text: string }
+  | { type: typeof ARENA_EVENT.mentorDelta; text: string; bubble?: MentorBubble }
   | { type: typeof ARENA_EVENT.mentorDone }
   | { type: typeof ARENA_EVENT.mentorError; kind: MentorErrorKind; detail: string }
   | { type: typeof ARENA_EVENT.leaderboardUpdated }

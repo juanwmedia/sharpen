@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useGame } from '@/entities/game/index.ts'
 import { PlayerLink } from '@/entities/player/index.ts'
 import { LanguageSwitch } from '@/features/language-switch/index.ts'
+import { RunModeSwitch } from '@/features/run-mode-switch/index.ts'
 import { Chip } from '@/shared/ui/index.ts'
 
 const { t } = useI18n()
@@ -19,6 +20,7 @@ onMounted(() => void boot())
     <div class="flex items-center gap-2">
       <Chip v-if="state.player" class="pl-[5px]"><PlayerLink :player="state.player" /></Chip>
       <Chip tone="dim">{{ t('app.engine', { version: state.engineVersion }) }}</Chip>
+      <RunModeSwitch />
       <LanguageSwitch />
     </div>
   </header>

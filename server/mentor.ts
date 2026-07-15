@@ -212,13 +212,16 @@ export function hintPrompt({ challenge, transcript, verdict, remainingMs }: {
   challenge: Challenge
   transcript: Array<{ command: string; output: string }>
   verdict: Verdict
-  remainingMs: number
+  /** Seconds left in challenge mode; null in learn (no timer). */
+  remainingMs: number | null
 }): string {
   const attempts = transcript.map((t) => `$ ${t.command}\n${t.output}`.trim()).join('\n')
   // Prompts always use the canonical English content: the mentor answers in
   // the player's language on its own (see LANGUAGE_RULES).
   const failed = verdict.checks.filter((c) => !c.pass).map((c) => `- ${c.name.en}: ${c.detail.en}`).join('\n')
-  return `LIVE CHALLENGE (do not reveal the solution). ${Math.round(remainingMs / 1000)}s left.
+  const clock =
+    remainingMs != null ? ` ${Math.round(remainingMs / 1000)}s left.` : ' No timer (learn mode).'
+  return `LIVE CHALLENGE (do not reveal the solution).${clock}
 
 Challenge: ${challenge.title}
 Goal: ${challenge.statement.en}

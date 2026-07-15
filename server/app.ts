@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import express from 'express'
 import { challengeSummaries } from '../challenges/index.ts'
-import { ARENA_EVENT, DEFAULT_LOCALE, LOCALES } from '../engine/types.ts'
+import { ARENA_EVENT, DEFAULT_LOCALE, DEFAULT_RUN_MODE, LOCALES, MENTOR_BUBBLE, RUN_MODES, type MentorBubble } from '../engine/types.ts'
 import { Mentor, followUpPrompt, hintPrompt, liveQuestionPrompt, praisePrompt, revealPrompt } from './mentor.ts'
 import { RUN_STATUS, RunStore, type Run } from './runs.ts'
 import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
@@ -49,7 +49,8 @@ function mentorFor(run: Run): Mentor {
   if (!run.mentor) {
     run.mentor = new Mentor({
       locale: run.locale,
-      onDelta: (text) => runs.emit(run, ARENA_EVENT.mentorDelta, { text }),
+      onDelta: (text) =>
+        runs.emit(run, ARENA_EVENT.mentorDelta, { text, bubble: run.mentorBubble }),
       onDone: () => {
         slog(`run=${run.id} mentor turn done`)
         runs.emit(run, ARENA_EVENT.mentorDone)
@@ -66,12 +67,17 @@ function mentorFor(run: Run): Mentor {
 // Every mentor request goes through here so the player immediately sees the
 // thinking indicator: a fresh `claude -p` takes seconds to first token, and
 // that silence must have a face.
-function askMentor(run: Run, prompt: string, opts?: { coalesce?: boolean }): boolean {
+function askMentor(
+  run: Run,
+  prompt: string,
+  opts?: { coalesce?: boolean; bubble?: MentorBubble }
+): boolean {
   // Hermetic-test escape hatch: SHARPEN_NO_MENTOR=1 skips spawning the claude
   // CLI entirely. Chosen over a mentorFactory injection because this module
   // exports a built app instance, not a builder, so an env flag is the
   // cleanest seam. No mentor events are emitted and asks report accepted=false.
   if (process.env.SHARPEN_NO_MENTOR === '1') return false
+  run.mentorBubble = opts?.bubble ?? MENTOR_BUBBLE.mentor
   const mentor = mentorFor(run)
   const accepted = mentor.ask(prompt, opts)
   slog(`run=${run.id} mentor ask accepted=${accepted} turns=${mentor.turns} queued=${mentor.queue.length}`)
@@ -94,9 +100,10 @@ app.get('/api/leaderboard', async (_req, res) => {
 app.post('/api/runs', async (req, res) => {
   const player = (req.body?.player ?? (await defaultPlayer())).slice(0, PLAYER_NAME_MAX_CHARS)
   const locale = LOCALES.find((l) => l === req.body?.locale) ?? DEFAULT_LOCALE
-  const run = runs.create({ challengeId: req.body?.challengeId, player, locale })
+  const mode = RUN_MODES.find((m) => m === req.body?.mode) ?? DEFAULT_RUN_MODE
+  const run = runs.create({ challengeId: req.body?.challengeId, player, locale, mode })
   if (!run) return res.status(404).json({ error: 'unknown challenge' })
-  res.json({ runId: run.id, player })
+  res.json({ runId: run.id, player, mode: run.mode })
 })
 
 app.get('/api/runs/:id', (req, res) => {
@@ -117,10 +124,21 @@ app.post('/api/runs/:id/start', (req, res) => {
   runs.start(run, (timedOut) => {
     slog(`run=${timedOut.id} timeout`)
     runs.emit(timedOut, ARENA_EVENT.timeout, {})
-    askMentor(timedOut, revealPrompt(timedOut))
+    askMentor(timedOut, revealPrompt(timedOut), { bubble: MENTOR_BUBBLE.reveal })
   })
-  slog(`run=${run.id} started player=${run.player} challenge=${run.challengeId}`)
-  res.json({ startedAt: run.startedAt, deadline: run.deadline })
+  slog(`run=${run.id} started player=${run.player} challenge=${run.challengeId} mode=${run.mode}`)
+  res.json({ startedAt: run.startedAt, deadline: run.deadline, mode: run.mode })
+})
+
+app.post('/api/runs/:id/reveal', (req, res) => {
+  const run = runs.get(req.params.id)
+  if (!run) return res.status(404).json({ error: 'unknown run' })
+  if (!runs.reveal(run)) {
+    return res.status(409).json({ error: `cannot reveal: mode=${run.mode} status=${run.status}` })
+  }
+  slog(`run=${run.id} reveal`)
+  askMentor(run, revealPrompt(run), { bubble: MENTOR_BUBBLE.reveal })
+  res.status(204).end()
 })
 
 app.post('/api/runs/:id/command', (req, res) => {
@@ -141,10 +159,12 @@ app.post('/api/runs/:id/submit', async (req, res) => {
   runs.emit(run, ARENA_EVENT.verdict, { pass: verdict.pass, checks: verdict.checks, attempts: run.attempts })
 
   if (verdict.pass) {
-    const evidence = await saveEvidence(run, verdict)
-    await recordResult(evidence)
-    runs.emit(run, ARENA_EVENT.leaderboardUpdated, {})
-    askMentor(run, praisePrompt({ challenge: run.challenge, durationMs: evidence.durationMs }))
+    if (run.mode === 'challenge') {
+      const evidence = await saveEvidence(run, verdict)
+      await recordResult(evidence)
+      runs.emit(run, ARENA_EVENT.leaderboardUpdated, {})
+    }
+    askMentor(run, praisePrompt({ challenge: run.challenge, durationMs: Date.now() - (run.startedAt ?? Date.now()) }))
   } else {
     askMentor(
       run,
@@ -152,7 +172,7 @@ app.post('/api/runs/:id/submit', async (req, res) => {
         challenge: run.challenge,
         transcript: run.transcript,
         verdict,
-        remainingMs: Math.max(0, (run.deadline ?? 0) - Date.now()),
+        remainingMs: run.deadline != null ? Math.max(0, run.deadline - Date.now()) : null,
       }),
       { coalesce: true }
     )
