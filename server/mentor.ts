@@ -230,7 +230,7 @@ export function hintPrompt({ challenge, transcript, verdict, remainingMs }: {
   return `LIVE CHALLENGE (do not reveal the solution).${clock}
 
 Challenge: ${challenge.title}
-Goal: ${challenge.statement.en}
+Goal: ${challenge.objective.en}
 
 Terminal so far:
 ${attempts || '(nothing typed yet)'}
@@ -249,7 +249,7 @@ export function revealPrompt({ challenge, transcript }: {
   return `TIMER EXPIRED. Reveal and teach.
 
 Challenge: ${challenge.title}
-Goal: ${challenge.statement.en}
+Goal: ${challenge.objective.en}
 
 Canonical walkthrough (your source of truth): ${challenge.walkthrough}
 

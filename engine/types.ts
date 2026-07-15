@@ -80,8 +80,13 @@ export interface Challenge {
   title: string
   difficulty: 'easy' | 'medium' | 'hard'
   timeLimitMs: number
-  statement: Localized
-  /** Concept chips under the statement (English git vocabulary). Not solving commands. */
+  /** Situation narrative. No solving commands. */
+  briefing: Localized
+  /** ASCII directory snapshot of the initial state. English paths only. */
+  tree: string
+  /** What "done" looks like in human terms. */
+  objective: Localized
+  /** Concept chips (English git vocabulary). Not solving commands. */
   themes: string[]
   /** Canonical solution, revealed by the mentor after timeout (challenge) or
    * voluntary reveal (learn). English only: it feeds the mentor. */
@@ -92,7 +97,7 @@ export interface Challenge {
 
 export type ChallengeSummary = Pick<
   Challenge,
-  'id' | 'pack' | 'title' | 'difficulty' | 'timeLimitMs' | 'statement' | 'themes'
+  'id' | 'pack' | 'title' | 'difficulty' | 'timeLimitMs' | 'briefing' | 'tree' | 'objective' | 'themes'
 >
 
 /** isomorphic-git PromiseFsClient produced by the fs bridge. */

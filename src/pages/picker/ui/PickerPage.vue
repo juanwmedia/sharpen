@@ -55,7 +55,7 @@ function enterArena(c: { pack: string; title: string }): void {
               }}
             </span>
           </div>
-          <p class="m-0 text-sm text-muted">{{ lt(c.statement) }}</p>
+          <p class="m-0 text-sm text-muted">{{ lt(c.objective) }}</p>
           <span class="mt-1 font-mono text-[12.5px] text-accent">{{ t('picker.enterArena') }}</span>
         </button>
       </div>

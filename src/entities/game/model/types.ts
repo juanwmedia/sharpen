@@ -4,6 +4,8 @@ import type { Challenge, ChallengeSummary, Check, LeaderboardRow, RunMode } from
  * pre-network idle/countdown phases). */
 export const RUN_STATUS = {
   idle: 'idle',
+  /** Challenge mode: scenario loaded, waiting for Start (no server run yet). */
+  briefing: 'briefing',
   countdown: 'countdown',
   live: 'live',
   passed: 'passed',

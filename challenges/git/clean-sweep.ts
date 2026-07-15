@@ -8,23 +8,46 @@ const DIRTY_CLIENT = `export async function fetchNotes(patientId: string) {
 }
 `
 
+const TREE = `repo/
+├── README.md
+├── build.log
+├── notes/
+│   └── ideas.md
+├── src/
+│   ├── index.ts
+│   └── api/
+│       ├── client.ts   (modified - keep)
+│       └── retry.ts
+└── tmp/
+    ├── cache.json
+    └── debug.log`
+
 export default {
   id: 'git/clean-sweep',
   pack: 'git',
   title: 'Clean sweep',
   difficulty: 'medium',
   timeLimitMs: 60_000,
-  statement: {
+  briefing: {
     en:
-      'Your working tree mixes real work in progress with debug junk. ' +
-      'Get rid of every untracked file and directory. ' +
-      'The modified tracked file must keep its changes, nothing may be staged, ' +
-      'and history must stay untouched.',
+      'You are in noa-notes, a small patient-notes client. ' +
+      'Someone left real work in progress next to debug junk: logs, a scratch notes folder, and a tmp cache. ' +
+      'The tracked edit in src/api/client.ts is intentional and must survive.',
     es:
-      'Tu working tree mezcla trabajo real en curso con basura de depuración. ' +
+      'Estás en noa-notes, un cliente pequeño de notas de pacientes. ' +
+      'Alguien dejó trabajo real en curso junto a basura de depuración: logs, una carpeta notes de borrador y una caché en tmp. ' +
+      'El cambio trackeado en src/api/client.ts es intencional y tiene que sobrevivir.',
+  },
+  tree: TREE,
+  objective: {
+    en:
+      'Remove every untracked file and directory. ' +
+      'Keep the modifications in src/api/client.ts. ' +
+      'Leave nothing staged, and keep history on main untouched.',
+    es:
       'Elimina todos los archivos y directorios sin seguimiento. ' +
-      'El archivo trackeado modificado debe conservar sus cambios, no puede quedar nada en el stage ' +
-      'y el historial tiene que permanecer intacto.',
+      'Conserva las modificaciones de src/api/client.ts. ' +
+      'No dejes nada en el stage y mantén el historial en main intacto.',
   },
   // Concept chips: domain vocabulary, never the solving command.
   themes: ['working tree', 'untracked', 'tracked', 'staging'],

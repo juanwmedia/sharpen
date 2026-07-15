@@ -222,10 +222,7 @@ async function fetchLearnSnapshot(challengeId: string): Promise<LearnSnapshot | 
   }
 }
 
-async function startRun(challengeId: string): Promise<void> {
-  const challenge = getChallenge(challengeId)
-  if (!challenge) return
-
+function resetClientRunFields(): void {
   learnTranscript = []
   mentorSessionId = null
   mentorTurns = 0
@@ -234,6 +231,38 @@ async function startRun(challengeId: string): Promise<void> {
     clearTimeout(learnSaveTimer)
     learnSaveTimer = null
   }
+  events?.close()
+  events = null
+  arena = null
+  shellTipShown = false
+  state.runId = null
+  state.branch = ARENA_DEFAULT_BRANCH
+  state.checks = null
+  state.mentorFeed = []
+  state.mentorBusy = false
+  state.deadline = 0
+  state.countdownNum = null
+}
+
+/** Challenge mode only: load the scenario into the UI without creating a
+ * server run. The timer starts when beginChallenge() calls startRun. */
+function prepareScenario(challengeId: string): void {
+  const challenge = getChallenge(challengeId)
+  if (!challenge) return
+  resetClientRunFields()
+  // markRaw: a Challenge carries setup/assert functions; proxying it deeply
+  // would be pure overhead (and reactivity on it is never needed).
+  state.challenge = markRaw(challenge)
+  state.status = RUN_STATUS.briefing
+}
+
+/** Modal Start (challenge) or Arena mount (learn): create the server run,
+ * optional countdown, then go live. */
+async function startRun(challengeId: string): Promise<void> {
+  const challenge = getChallenge(challengeId)
+  if (!challenge) return
+
+  resetClientRunFields()
 
   const snapshot = state.mode === 'learn' ? await fetchLearnSnapshot(challengeId) : null
 
@@ -244,15 +273,8 @@ async function startRun(challengeId: string): Promise<void> {
     mode: state.mode,
   })
 
-  // markRaw: a Challenge carries setup/assert functions; proxying it deeply
-  // would be pure overhead (and reactivity on it is never needed).
   state.challenge = markRaw(challenge)
   state.runId = runId
-  state.branch = ARENA_DEFAULT_BRANCH
-  state.checks = null
-  state.mentorFeed = []
-  state.mentorBusy = false
-  shellTipShown = false
 
   arena = await createArena(challenge)
   connectEvents(runId)
@@ -292,6 +314,11 @@ async function startRun(challengeId: string): Promise<void> {
   }
   await refreshChecks()
   flushTerminalReplay()
+}
+
+async function beginChallenge(): Promise<void> {
+  if (state.status !== RUN_STATUS.briefing || !state.challenge) return
+  await startRun(state.challenge.id)
 }
 
 /** Rubric from the local arena: same assert() as the server, no submit side effects. */
@@ -561,7 +588,9 @@ export function useGame() {
   return {
     state: readonly(state),
     boot,
+    prepareScenario,
     startRun,
+    beginChallenge,
     leaveRun,
     askMentor,
     refreshLeaderboard,

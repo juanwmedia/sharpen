@@ -61,7 +61,7 @@ skills/       The Claude Code plugin skill that boots the arena.
 - intlify treats bare `@` and `|` inside messages as syntax and the failure
   is a RUNTIME SyntaxError that unmounts the component subtree. Escape as
   `{'@'}` / `{'|'}`.
-- Challenge content (statement, check name/detail) is bilingual by contract:
+- Challenge content (briefing, objective, check name/detail) is bilingual by contract:
   `Localized = Record<Locale, string>`, the author writes every language and
   TypeScript enforces completeness. English is canonical: mentor prompts and
   evidence always use `.en`. The web picks with `lt()` from `@/shared/i18n`.
@@ -103,8 +103,9 @@ skills/       The Claude Code plugin skill that boots the arena.
    come from the arena.
 3. `assert(ctx)`: pure state checks over `ctx.snapshot` (plus `ctx.fs` for
    file contents). Each check carries bilingual `name` and `detail`.
-4. `statement` bilingual; `walkthrough` English only (mentor source of truth
-   for the reveal); `themes` for soft UI concept chips (not solving commands).
+4. `briefing` + `objective` bilingual; `tree` English ASCII snapshot; `walkthrough`
+   English only (mentor source of truth for the reveal); `themes` for soft UI
+   concept chips (not solving commands).
 5. Register it in `challenges/index.ts`. The URL becomes
    `/<pack>/<slugify(title)>`; `test/slug.test.ts` guards collisions.
 6. If it needs a git subcommand the porcelain lacks, extend

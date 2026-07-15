@@ -31,10 +31,10 @@ and opens the arena in your browser. Each challenge has its own URL
 
 The arena speaks English and Spanish: switch with the EN/ES toggle in the top
 bar (persisted locally, English by default). The mentor answers in your
-language too. Challenge content (statement and verdict checks) is written in
-both languages by the challenge author and the type system enforces it; titles
-and URL slugs stay in English, and the emulated git speaks English like the
-real one.
+language too. Challenge content (briefing, objective, and verdict checks) is
+written in both languages by the challenge author and the type system enforces
+it; the ASCII tree and titles/URL slugs stay in English, and the emulated git
+speaks English like the real one.
 
 ## How it works
 
@@ -91,8 +91,8 @@ npm run typecheck  # vue-tsc --noEmit
 
 To add a challenge: create `challenges/<pack>/<name>.ts` exporting an object
 that `satisfies Challenge` (deterministic `setup`, state-based `assert`,
-bilingual `statement` and check texts), then register it in
-`challenges/index.ts`. Its URL becomes `/challenge/<slug-of-title>`.
+bilingual `briefing`/`objective` and check texts, English `tree`), then register
+it in `challenges/index.ts`. Its URL becomes `/<pack>/<slug-of-title>`.
 
 Architecture, contracts and conventions live in `CLAUDE.md`. Verified
 third-party API facts (just-bash, isomorphic-git, wterm, claude CLI, vue-i18n)

@@ -37,9 +37,13 @@ describe('sharpen API', () => {
       timeLimitMs: 60_000,
     })
     // Challenge content is bilingual: authors write every language.
-    expect(typeof (first!.statement as Record<string, unknown>).en).toBe('string')
-    expect(typeof (first!.statement as Record<string, unknown>).es).toBe('string')
+    expect(typeof (first!.briefing as Record<string, unknown>).en).toBe('string')
+    expect(typeof (first!.briefing as Record<string, unknown>).es).toBe('string')
+    expect(typeof first!.tree).toBe('string')
+    expect(typeof (first!.objective as Record<string, unknown>).en).toBe('string')
+    expect(typeof (first!.objective as Record<string, unknown>).es).toBe('string')
     expect(first!.themes).toEqual(['working tree', 'untracked', 'tracked', 'staging'])
+    expect(first).not.toHaveProperty('statement')
     // Summaries must not leak the solution or the executable hooks.
     expect(first).not.toHaveProperty('walkthrough')
     expect(first).not.toHaveProperty('setup')

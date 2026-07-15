@@ -20,13 +20,15 @@ export function getChallengeByPackSlug(pack: string, slug: string): Challenge | 
 }
 
 export function challengeSummaries(): ChallengeSummary[] {
-  return challenges.map(({ id, pack, title, difficulty, timeLimitMs, statement, themes }) => ({
+  return challenges.map(({ id, pack, title, difficulty, timeLimitMs, briefing, tree, objective, themes }) => ({
     id,
     pack,
     title,
     difficulty,
     timeLimitMs,
-    statement,
+    briefing,
+    tree,
+    objective,
     themes,
   }))
 }

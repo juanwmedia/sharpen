@@ -40,6 +40,14 @@ export default {
   arena: {
     back: 'Volver a los escenarios',
   },
+  scenario: {
+    briefing: 'Situación',
+    objective: 'Objetivo',
+  },
+  briefingModal: {
+    start: 'Empezar desafío',
+    back: 'Volver a los escenarios',
+  },
   terminal: {
     // {'@'} escapes the bare @, which intlify parses as a linked message.
     title: "you{'@'}sharpen · /repo",

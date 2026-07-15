@@ -1,6 +1,6 @@
-// English UI copy. Default language. Challenge content (titles, statements,
-// check names) is authored in English and is intentionally NOT translated:
-// it is content, not chrome, and git itself speaks English.
+// English UI copy. Default language. Challenge content (titles, briefings,
+// objectives, check names) is authored in English and is intentionally NOT
+// translated: it is content, not chrome, and git itself speaks English.
 export default {
   app: {
     engine: 'engine {version}',
@@ -39,6 +39,14 @@ export default {
     best: 'best',
   },
   arena: {
+    back: 'Back to scenarios',
+  },
+  scenario: {
+    briefing: 'Situation',
+    objective: 'Objective',
+  },
+  briefingModal: {
+    start: 'Start challenge',
     back: 'Back to scenarios',
   },
   terminal: {
