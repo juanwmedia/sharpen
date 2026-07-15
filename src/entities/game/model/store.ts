@@ -20,13 +20,14 @@ import type {
   MentorErrorKind,
   RunMode,
 } from '@engine/types.ts'
-import { apiRoutes, getJson, postJson } from '@/shared/api/index.ts'
+import { apiRoutes, deleteJson, getJson, postJson, putJson } from '@/shared/api/index.ts'
 import {
   COMMAND_OUTPUT_MAX_CHARS,
   COUNTDOWN_STEPS,
   COUNTDOWN_STEP_MS,
   DEFAULT_TIME_LIMIT_MS,
   DETACHED_HEAD_LABEL,
+  LEARN_SAVE_DEBOUNCE_MS,
   RUN_LOST_REDIRECT_MS,
   RUN_MODE_STORAGE_KEY,
   SHELL_COMMANDS,
@@ -35,6 +36,23 @@ import { currentLocale, t } from '@/shared/i18n/index.ts'
 import { ansi, CRLF } from '@/shared/lib/ansi.ts'
 import { MENTOR_ROLE, RUN_STATUS } from './types.ts'
 import type { GameState, MentorItem, MentorRole } from './types.ts'
+
+interface LearnTranscriptEntry {
+  command: string
+  output: string
+}
+
+interface LearnSnapshot {
+  schema: 1
+  challengeId: string
+  locale: string
+  status: 'live' | 'passed' | 'revealed'
+  transcript: LearnTranscriptEntry[]
+  mentorFeed: MentorItem[]
+  mentorSessionId: string | null
+  mentorTurns: number
+  updatedAt: number
+}
 
 function storedRunMode(): RunMode {
   try {
@@ -77,6 +95,14 @@ let mentorNewTurn = true
 /** Role for the mentor turn currently streaming (set from the first delta). */
 let mentorTurnRole: MentorRole = MENTOR_ROLE.mentor
 
+/** Mirror of server transcript for learn-mode persistence. */
+let learnTranscript: LearnTranscriptEntry[] = []
+let mentorSessionId: string | null = null
+let mentorTurns = 0
+let learnSaveTimer: ReturnType<typeof setTimeout> | null = null
+/** Replay into the terminal once the writer is registered. */
+let pendingTerminalReplay: LearnTranscriptEntry[] | null = null
+
 /** Server error kinds mapped to localized bubbles (see server/mentor.ts). */
 const MENTOR_ERROR_KEYS: Record<MentorErrorKind, string> = {
   [MENTOR_ERROR_KIND.budget]: 'mentorError.budget',
@@ -85,8 +111,41 @@ const MENTOR_ERROR_KEYS: Record<MentorErrorKind, string> = {
   [MENTOR_ERROR_KIND.failed]: 'mentorError.failed',
 }
 
+function historyPrompt(): string {
+  return `${ansi.dim('➜')} ${ansi.dim('repo')} ${ansi.dim('git:(')}${ansi.dim(state.branch)}${ansi.dim(')')} `
+}
+
+function livePrompt(): string {
+  return `${ansi.ember('➜')} ${ansi.cyan('repo')} ${ansi.dim('git:(')}${ansi.red(state.branch)}${ansi.dim(')')} `
+}
+
+/** Stored output is stdout+stderr concatenated; paint the common error cases red. */
+function styleStoredOutput(output: string): string {
+  const normalized = output.replace(/\n/g, CRLF).replace(/(?:\r?\n)+$/, '')
+  if (!normalized) return ''
+  if (/^(bash|sharpen|git):/m.test(normalized) || /command not found|not a git repository/i.test(normalized)) {
+    return ansi.red(normalized) + CRLF
+  }
+  return normalized + CRLF
+}
+
+function flushTerminalReplay(): void {
+  if (!pendingTerminalReplay) return
+  const entries = pendingTerminalReplay
+  pendingTerminalReplay = null
+  if (!entries.length) return
+  // TermShell.attach may already have drawn a live prompt on this line.
+  termWrite(`\r\x1b[K${ansi.dim(t('terminal.restored', { count: entries.length }))}${CRLF}`)
+  for (const entry of entries) {
+    termWrite(historyPrompt() + entry.command + CRLF)
+    termWrite(styleStoredOutput(entry.output))
+  }
+  termWrite(livePrompt())
+}
+
 export function registerTerminalWriter(writer: (data: string) => void): void {
   termWrite = writer
+  flushTerminalReplay()
 }
 
 export function registerRunLostHandler(handler: () => void): void {
@@ -113,9 +172,70 @@ async function refreshLeaderboard(): Promise<void> {
   state.leaderboard = await getJson<LeaderboardRow[]>(apiRoutes.leaderboard)
 }
 
+function learnPersistStatus(): LearnSnapshot['status'] | null {
+  if (state.status === RUN_STATUS.live) return 'live'
+  if (state.status === RUN_STATUS.passed) return 'passed'
+  if (state.status === RUN_STATUS.revealed) return 'revealed'
+  return null
+}
+
+function scheduleLearnSave(): void {
+  if (state.mode !== 'learn' || !state.challenge) return
+  const persistStatus = learnPersistStatus()
+  if (!persistStatus) return
+  if (learnSaveTimer) clearTimeout(learnSaveTimer)
+  learnSaveTimer = setTimeout(() => {
+    learnSaveTimer = null
+    void persistLearnNow()
+  }, LEARN_SAVE_DEBOUNCE_MS)
+}
+
+async function persistLearnNow(): Promise<void> {
+  if (state.mode !== 'learn' || !state.challenge) return
+  const persistStatus = learnPersistStatus()
+  if (!persistStatus) return
+  const snapshot: LearnSnapshot = {
+    schema: 1,
+    challengeId: state.challenge.id,
+    locale: currentLocale(),
+    status: persistStatus,
+    transcript: learnTranscript.map((t) => ({
+      command: t.command,
+      output: t.output.slice(0, COMMAND_OUTPUT_MAX_CHARS),
+    })),
+    mentorFeed: state.mentorFeed.filter((m) => m.role !== MENTOR_ROLE.thinking),
+    mentorSessionId,
+    mentorTurns,
+    updatedAt: Date.now(),
+  }
+  await putJson(apiRoutes.learn(state.challenge.id), snapshot).catch(() => {})
+}
+
+async function fetchLearnSnapshot(challengeId: string): Promise<LearnSnapshot | null> {
+  try {
+    const res = await fetch(apiRoutes.learn(challengeId))
+    if (!res.ok) return null
+    const data = (await res.json()) as LearnSnapshot | null
+    return data
+  } catch {
+    return null
+  }
+}
+
 async function startRun(challengeId: string): Promise<void> {
   const challenge = getChallenge(challengeId)
   if (!challenge) return
+
+  learnTranscript = []
+  mentorSessionId = null
+  mentorTurns = 0
+  pendingTerminalReplay = null
+  if (learnSaveTimer) {
+    clearTimeout(learnSaveTimer)
+    learnSaveTimer = null
+  }
+
+  const snapshot = state.mode === 'learn' ? await fetchLearnSnapshot(challengeId) : null
 
   // Locale + mode ride along so the server steers timer and mentor language.
   const { runId } = await postJson<{ runId: string }>(apiRoutes.runs, {
@@ -137,6 +257,23 @@ async function startRun(challengeId: string): Promise<void> {
   arena = await createArena(challenge)
   connectEvents(runId)
 
+  if (snapshot && state.mode === 'learn') {
+    await postJson(apiRoutes.runRestore(runId), {
+      transcript: snapshot.transcript,
+      status: snapshot.status,
+      mentorSessionId: snapshot.mentorSessionId,
+      mentorTurns: snapshot.mentorTurns,
+    })
+    learnTranscript = snapshot.transcript.map((t) => ({ ...t }))
+    mentorSessionId = snapshot.mentorSessionId
+    mentorTurns = snapshot.mentorTurns
+    state.mentorFeed = snapshot.mentorFeed.filter((m) => m.role !== MENTOR_ROLE.thinking)
+    for (const { command } of snapshot.transcript) {
+      await arena.exec(command)
+    }
+    pendingTerminalReplay = snapshot.transcript.map((t) => ({ ...t }))
+  }
+
   if (state.mode === 'challenge') {
     state.status = RUN_STATUS.countdown
     for (const step of COUNTDOWN_STEPS) {
@@ -146,10 +283,15 @@ async function startRun(challengeId: string): Promise<void> {
     state.countdownNum = null
   }
 
-  const started = await postJson<{ deadline: number | null }>(apiRoutes.runStart(runId))
-  state.status = RUN_STATUS.live
+  const started = await postJson<{ deadline: number | null; status?: string }>(apiRoutes.runStart(runId))
   state.deadline = started.deadline ?? 0
+  if (snapshot && state.mode === 'learn' && (snapshot.status === 'passed' || snapshot.status === 'revealed')) {
+    state.status = snapshot.status === 'passed' ? RUN_STATUS.passed : RUN_STATUS.revealed
+  } else {
+    state.status = RUN_STATUS.live
+  }
   await refreshChecks()
+  flushTerminalReplay()
 }
 
 /** Rubric from the local arena: same assert() as the server, no submit side effects. */
@@ -162,6 +304,13 @@ async function refreshChecks(): Promise<void> {
 // Called when the arena page unmounts (back button, browser back, run lost):
 // the run's client-side life ends here. Idempotent.
 function leaveRun(): void {
+  if (state.mode === 'learn' && state.challenge) {
+    if (learnSaveTimer) {
+      clearTimeout(learnSaveTimer)
+      learnSaveTimer = null
+    }
+    void persistLearnNow()
+  }
   events?.close()
   events = null
   state.status = RUN_STATUS.idle
@@ -174,6 +323,22 @@ async function revealSolution(): Promise<void> {
   if (!res.ok) return
   state.status = RUN_STATUS.revealed
   termWrite(ansi.yellow(t('terminal.revealed')) + CRLF)
+  scheduleLearnSave()
+}
+
+async function wipeLearn(): Promise<void> {
+  if (state.mode !== 'learn' || !state.challenge) return
+  const challengeId = state.challenge.id
+  if (learnSaveTimer) {
+    clearTimeout(learnSaveTimer)
+    learnSaveTimer = null
+  }
+  await deleteJson(apiRoutes.learn(challengeId)).catch(() => {})
+  events?.close()
+  events = null
+  state.status = RUN_STATUS.idle
+  state.runId = null
+  await startRun(challengeId)
 }
 
 // ---------- terminal integration -------------------------------------------
@@ -203,12 +368,17 @@ export async function onCommand(command: string, result: ExecResult): Promise<vo
   const firstErrLine = result.exitCode !== 0 ? (result.stderr.split('\n')[0] ?? '') : ''
   state.mentorFeed.push({ role: MENTOR_ROLE.youCmd, text: command, ...(firstErrLine ? { meta: firstErrLine } : {}) })
   if (state.status !== RUN_STATUS.live) return
+  const output = (result.stdout + result.stderr).slice(0, COMMAND_OUTPUT_MAX_CHARS)
+  if (state.mode === 'learn') {
+    learnTranscript.push({ command, output })
+  }
   await fetch(apiRoutes.runCommand(state.runId ?? ''), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ command, output: (result.stdout + result.stderr).slice(0, COMMAND_OUTPUT_MAX_CHARS) }),
+    body: JSON.stringify({ command, output }),
   }).catch(() => {})
   await submit({ quiet: true })
+  scheduleLearnSave()
 }
 
 export async function submit({ quiet = false }: { quiet?: boolean } = {}): Promise<void> {
@@ -228,6 +398,7 @@ export async function submit({ quiet = false }: { quiet?: boolean } = {}): Promi
   if (verdict.pass) {
     state.status = RUN_STATUS.passed
     termWrite(ansi.green(t('terminal.solved')) + CRLF)
+    scheduleLearnSave()
   } else {
     const green = verdict.checks.filter((c) => c.pass).length
     termWrite(
@@ -276,6 +447,7 @@ async function askMentor(question: string): Promise<void> {
   const trimmed = question.trim()
   if (!trimmed || !state.runId) return
   state.mentorFeed.push({ role: MENTOR_ROLE.you, text: trimmed })
+  scheduleLearnSave()
   // Rejections (budget reached, queue full) surface through the SSE
   // mentor-error event with a localized bubble, so the response body is not
   // inspected here: doing both painted the same failure twice.
@@ -299,6 +471,7 @@ function pushMentorError(kind: string, detail: string): void {
   state.mentorFeed = state.mentorFeed.filter((m) => m.role !== MENTOR_ROLE.thinking)
   state.mentorFeed.push(item)
   state.mentorBusy = false
+  scheduleLearnSave()
 }
 
 function bubbleToRole(bubble?: MentorBubble): MentorRole {
@@ -354,9 +527,20 @@ function connectEvents(runId: string): void {
       mentorNewTurn = false
     }
   })
-  events.addEventListener(ARENA_EVENT.mentorDone, () => {
+  events.addEventListener(ARENA_EVENT.mentorDone, (e) => {
     state.mentorBusy = false
     mentorNewTurn = true
+    try {
+      const data = JSON.parse((e as MessageEvent).data || '{}') as {
+        mentorSessionId?: string | null
+        mentorTurns?: number
+      }
+      if (data.mentorSessionId !== undefined) mentorSessionId = data.mentorSessionId
+      if (typeof data.mentorTurns === 'number') mentorTurns = data.mentorTurns
+    } catch {
+      /* empty mentor-done payloads are fine */
+    }
+    scheduleLearnSave()
   })
   events.addEventListener(ARENA_EVENT.mentorError, (e) => {
     const { kind, detail } = JSON.parse((e as MessageEvent).data) as { kind?: string; detail: string }
@@ -383,5 +567,6 @@ export function useGame() {
     refreshLeaderboard,
     setRunMode,
     revealSolution,
+    wipeLearn,
   }
 }

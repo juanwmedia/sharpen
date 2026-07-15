@@ -55,6 +55,34 @@ async function complete(child: FakeChild, { code = 0, text = 'answer' } = {}) {
 }
 
 describe('Mentor queue', () => {
+  it('resumes a seeded sessionId with --resume on the first spawn', async () => {
+    const children: FakeChild[] = []
+    const spawnFn: SpawnFn = (_cmd, args) => {
+      const child = new FakeChild()
+      ;(child as FakeChild & { args: string[] }).args = args
+      children.push(child)
+      return child
+    }
+    const mentor = new Mentor({
+      onDelta: vi.fn(),
+      onDone: vi.fn(),
+      onError: vi.fn(),
+      spawnFn,
+      sessionId: 'restored-session',
+      turns: 3,
+    })
+    expect(mentor.sessionId).toBe('restored-session')
+    expect(mentor.turns).toBe(3)
+    mentor.ask('follow-up')
+    expect(children).toHaveLength(1)
+    const args = (children[0] as FakeChild & { args: string[] }).args
+    expect(args).toContain('--resume')
+    expect(args).toContain('restored-session')
+    expect(args).not.toContain('--session-id')
+    await complete(children[0]!)
+    expect(mentor.turns).toBe(4)
+  })
+
   it('drains three rapid asks serially, in order', async () => {
     const { mentor, children, onDone } = harness()
 

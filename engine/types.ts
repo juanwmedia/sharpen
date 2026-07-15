@@ -170,6 +170,6 @@ export type ArenaEvent =
   | { type: typeof ARENA_EVENT.timeout }
   | { type: typeof ARENA_EVENT.mentorThinking }
   | { type: typeof ARENA_EVENT.mentorDelta; text: string; bubble?: MentorBubble }
-  | { type: typeof ARENA_EVENT.mentorDone }
+  | { type: typeof ARENA_EVENT.mentorDone; mentorSessionId?: string | null; mentorTurns?: number }
   | { type: typeof ARENA_EVENT.mentorError; kind: MentorErrorKind; detail: string }
   | { type: typeof ARENA_EVENT.leaderboardUpdated }

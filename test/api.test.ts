@@ -138,4 +138,75 @@ describe('sharpen API', () => {
     expect(res.status).toBe(400)
     expect(res.body).toEqual({ error: 'empty question' })
   })
+
+  it('learn snapshot PUT/GET/DELETE round-trips on disk', async () => {
+    const id = encodeURIComponent('git/clean-sweep')
+    const body = {
+      schema: 1,
+      challengeId: 'git/clean-sweep',
+      locale: 'en',
+      status: 'live',
+      transcript: [{ command: 'git status', output: 'dirty' }],
+      mentorFeed: [{ role: 'mentor', text: 'nudge' }],
+      mentorSessionId: 'sess-1',
+      mentorTurns: 2,
+      updatedAt: 1,
+    }
+    expect((await request(app).put(`/api/learn/${id}`).send(body)).status).toBe(204)
+    const got = await request(app).get(`/api/learn/${id}`)
+    expect(got.status).toBe(200)
+    expect(got.body).toMatchObject({
+      challengeId: 'git/clean-sweep',
+      status: 'live',
+      mentorSessionId: 'sess-1',
+      mentorTurns: 2,
+    })
+    expect(got.body.transcript).toHaveLength(1)
+    expect(existsSync(join(dataDir, 'learn', 'git__clean-sweep.json'))).toBe(true)
+
+    expect((await request(app).delete(`/api/learn/${id}`)).status).toBe(204)
+    const empty = await request(app).get(`/api/learn/${id}`)
+    expect(empty.status).toBe(200)
+    expect(empty.body).toBeNull()
+  })
+
+  it('learn API rejects unknown challenge ids', async () => {
+    const id = encodeURIComponent('git/nope')
+    expect((await request(app).get(`/api/learn/${id}`)).status).toBe(404)
+    expect((await request(app).put(`/api/learn/${id}`).send({ schema: 1 })).status).toBe(404)
+    expect((await request(app).delete(`/api/learn/${id}`)).status).toBe(404)
+  })
+
+  it('learn GET returns null when no snapshot exists yet', async () => {
+    const id = encodeURIComponent('git/clean-sweep')
+    await request(app).delete(`/api/learn/${id}`)
+    const res = await request(app).get(`/api/learn/${id}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toBeNull()
+  })
+
+  it('challenge start never writes learn snapshots', async () => {
+    const id = encodeURIComponent('git/clean-sweep')
+    await request(app).delete(`/api/learn/${id}`)
+    const runId = await createRun('challenge')
+    await request(app).post(`/api/runs/${runId}/start`)
+    expect(existsSync(join(dataDir, 'learn', 'git__clean-sweep.json'))).toBe(false)
+  })
+
+  it('learn restore injects transcript before submit', async () => {
+    const runId = await createRun('learn')
+    const restore = await request(app)
+      .post(`/api/runs/${runId}/restore`)
+      .send({
+        transcript: [{ command: 'git clean -fd', output: '' }],
+        status: 'live',
+        mentorSessionId: null,
+        mentorTurns: 0,
+      })
+    expect(restore.status).toBe(200)
+    await request(app).post(`/api/runs/${runId}/start`)
+    const submit = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(submit.status).toBe(200)
+    expect(submit.body.pass).toBe(true)
+  })
 })

@@ -15,11 +15,12 @@ import {
   type Verdict,
 } from '../engine/types.ts'
 import type { Mentor } from './mentor.ts'
+import type { LearnStatus } from './learn.ts'
 
 const HEARTBEAT_MS = 15_000
 const RUN_ID_CHARS = 8
 /** Cap on stored per-command output: it feeds mentor prompts and evidence. */
-const TRANSCRIPT_OUTPUT_MAX_CHARS = 4000
+export const TRANSCRIPT_OUTPUT_MAX_CHARS = 4000
 
 export const RUN_STATUS = {
   ready: 'ready',
@@ -53,6 +54,11 @@ export interface Run {
   mentor: Mentor | null
   /** Bubble kind for the mentor turn currently streaming (or next ask). */
   mentorBubble: MentorBubble
+  /** Seeds for Mentor when restoring a learn session. */
+  mentorSessionId: string | null
+  mentorTurns: number
+  /** Applied in start() after going live (learn restore of a finished run). */
+  restoredStatus: LearnStatus | null
 }
 
 // In-memory run registry. One run = one attempt at one challenge by the local
@@ -92,6 +98,9 @@ export class RunStore {
       clients: new Set(),
       mentor: null,
       mentorBubble: MENTOR_BUBBLE.mentor,
+      mentorSessionId: null,
+      mentorTurns: 0,
+      restoredStatus: null,
     }
     this.runs.set(run.id, run)
     return run
@@ -136,7 +145,37 @@ export class RunStore {
       }, run.challenge.timeLimitMs)
     }
     this.emit(run, ARENA_EVENT.started, { startedAt: run.startedAt, deadline: run.deadline })
+    if (run.restoredStatus === 'passed' || run.restoredStatus === 'revealed') {
+      run.status = run.restoredStatus
+    }
+    run.restoredStatus = null
     return run
+  }
+
+  /** Learn restore: inject transcript + mentor seeds while still ready for start(). */
+  restore(
+    run: Run,
+    {
+      transcript,
+      status,
+      mentorSessionId,
+      mentorTurns,
+    }: {
+      transcript: TranscriptEntry[]
+      status: LearnStatus
+      mentorSessionId: string | null
+      mentorTurns: number
+    }
+  ): boolean {
+    if (run.mode !== 'learn' || run.status !== RUN_STATUS.ready) return false
+    run.transcript = transcript.map((t) => ({
+      command: t.command,
+      output: String(t.output ?? '').slice(0, TRANSCRIPT_OUTPUT_MAX_CHARS),
+    }))
+    run.mentorSessionId = mentorSessionId
+    run.mentorTurns = Math.max(0, mentorTurns)
+    run.restoredStatus = status === 'passed' || status === 'revealed' ? status : null
+    return true
   }
 
   /** Learn-mode voluntary reveal: same mentor teach path as challenge timeout,

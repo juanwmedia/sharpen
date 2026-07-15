@@ -57,6 +57,7 @@ export default {
     timeUp: 'Solution revealed. The mentor is teaching. You can keep experimenting.',
     timeout: '⏱ {seconds} seconds are gone. Mentor incoming, and you can keep typing.',
     revealed: 'Solution revealed. The mentor is teaching. You can keep experimenting.',
+    restored: 'Restored {count} commands from last session.',
     runLost: 'The arena server restarted and this run is gone. Taking you back to the challenges…',
   },
   chat: {
@@ -87,12 +88,19 @@ export default {
     solved: 'solved',
     revealed: 'revealed',
     reveal: 'Reveal solution',
+    wipe: 'Wipe progress',
   },
   revealModal: {
     title: 'Reveal the solution?',
     body: 'The mentor will walk you through the canonical approach. You can keep typing afterward, but the Socratic guardrail ends.',
     confirm: 'Reveal',
     cancel: 'Keep trying',
+  },
+  wipeModal: {
+    title: 'Wipe learn progress?',
+    body: 'This clears your saved commands and mentor conversation for this challenge. Challenge mode is unaffected.',
+    confirm: 'Wipe and restart',
+    cancel: 'Keep progress',
   },
   verdict: {
     eyebrow: 'verdict',

@@ -33,6 +33,9 @@ export const DEFAULT_TIME_LIMIT_MS = 60_000
 export const LOCALE_STORAGE_KEY = 'sharpen.locale'
 export const RUN_MODE_STORAGE_KEY = 'sharpen.runMode'
 
+/** Debounce for writing learn progress to ~/.sharpen/learn/. */
+export const LEARN_SAVE_DEBOUNCE_MS = 400
+
 /** Prompt label when the repo is not on any branch (detached HEAD). */
 export const DETACHED_HEAD_LABEL = 'HEAD'
 

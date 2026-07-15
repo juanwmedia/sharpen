@@ -3,10 +3,17 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import express from 'express'
-import { challengeSummaries } from '../challenges/index.ts'
+import { challengeSummaries, getChallenge } from '../challenges/index.ts'
 import { ARENA_EVENT, DEFAULT_LOCALE, DEFAULT_RUN_MODE, LOCALES, MENTOR_BUBBLE, RUN_MODES, type MentorBubble } from '../engine/types.ts'
+import {
+  deleteLearn,
+  LEARN_STATUSES,
+  loadLearn,
+  parseLearnSnapshot,
+  saveLearn,
+} from './learn.ts'
 import { Mentor, followUpPrompt, hintPrompt, liveQuestionPrompt, praisePrompt, revealPrompt } from './mentor.ts'
-import { RUN_STATUS, RunStore, type Run } from './runs.ts'
+import { RUN_STATUS, RunStore, type Run, type TranscriptEntry } from './runs.ts'
 import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -49,11 +56,18 @@ function mentorFor(run: Run): Mentor {
   if (!run.mentor) {
     run.mentor = new Mentor({
       locale: run.locale,
+      sessionId: run.mentorSessionId,
+      turns: run.mentorTurns,
       onDelta: (text) =>
         runs.emit(run, ARENA_EVENT.mentorDelta, { text, bubble: run.mentorBubble }),
       onDone: () => {
         slog(`run=${run.id} mentor turn done`)
-        runs.emit(run, ARENA_EVENT.mentorDone)
+        run.mentorSessionId = run.mentor?.sessionId ?? null
+        run.mentorTurns = run.mentor?.turns ?? 0
+        runs.emit(run, ARENA_EVENT.mentorDone, {
+          mentorSessionId: run.mentorSessionId,
+          mentorTurns: run.mentorTurns,
+        })
       },
       onError: (kind, detail) => {
         slog(`run=${run.id} mentor ${kind}: ${String(detail).slice(0, LOG_DETAIL_MAX_CHARS)}`)
@@ -97,6 +111,31 @@ app.get('/api/leaderboard', async (_req, res) => {
   res.json(await leaderboard())
 })
 
+app.get('/api/learn/:challengeId', async (req, res) => {
+  const challengeId = decodeURIComponent(req.params.challengeId)
+  if (!getChallenge(challengeId)) return res.status(404).json({ error: 'unknown challenge' })
+  // 200 + null when empty: a 404 is correct REST but the browser paints every
+  // failed fetch red in the console on every Learn enter.
+  const snapshot = await loadLearn(challengeId)
+  res.json(snapshot)
+})
+
+app.put('/api/learn/:challengeId', async (req, res) => {
+  const challengeId = decodeURIComponent(req.params.challengeId)
+  if (!getChallenge(challengeId)) return res.status(404).json({ error: 'unknown challenge' })
+  const snapshot = parseLearnSnapshot({ ...req.body, challengeId }, challengeId)
+  if (!snapshot) return res.status(400).json({ error: 'invalid snapshot' })
+  await saveLearn(snapshot)
+  res.status(204).end()
+})
+
+app.delete('/api/learn/:challengeId', async (req, res) => {
+  const challengeId = decodeURIComponent(req.params.challengeId)
+  if (!getChallenge(challengeId)) return res.status(404).json({ error: 'unknown challenge' })
+  await deleteLearn(challengeId)
+  res.status(204).end()
+})
+
 app.post('/api/runs', async (req, res) => {
   const player = (req.body?.player ?? (await defaultPlayer())).slice(0, PLAYER_NAME_MAX_CHARS)
   const locale = LOCALES.find((l) => l === req.body?.locale) ?? DEFAULT_LOCALE
@@ -109,7 +148,12 @@ app.post('/api/runs', async (req, res) => {
 app.get('/api/runs/:id', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
-  res.json({ status: run.status, deadline: run.deadline })
+  res.json({
+    status: run.status,
+    deadline: run.deadline,
+    mentorSessionId: run.mentor?.sessionId ?? run.mentorSessionId,
+    mentorTurns: run.mentor?.turns ?? run.mentorTurns,
+  })
 })
 
 app.get('/api/runs/:id/events', (req, res) => {
@@ -127,7 +171,34 @@ app.post('/api/runs/:id/start', (req, res) => {
     askMentor(timedOut, revealPrompt(timedOut), { bubble: MENTOR_BUBBLE.reveal })
   })
   slog(`run=${run.id} started player=${run.player} challenge=${run.challengeId} mode=${run.mode}`)
-  res.json({ startedAt: run.startedAt, deadline: run.deadline, mode: run.mode })
+  res.json({ startedAt: run.startedAt, deadline: run.deadline, mode: run.mode, status: run.status })
+})
+
+app.post('/api/runs/:id/restore', (req, res) => {
+  const run = runs.get(req.params.id)
+  if (!run) return res.status(404).json({ error: 'unknown run' })
+  const status = LEARN_STATUSES.find((s) => s === req.body?.status)
+  if (!status || !Array.isArray(req.body?.transcript)) {
+    return res.status(400).json({ error: 'invalid restore body' })
+  }
+  const transcript = (req.body.transcript as TranscriptEntry[]).map((t) => ({
+    command: String(t.command ?? ''),
+    output: String(t.output ?? ''),
+  }))
+  const mentorSessionId =
+    req.body.mentorSessionId === null || typeof req.body.mentorSessionId === 'string'
+      ? (req.body.mentorSessionId as string | null)
+      : null
+  const mentorTurns = typeof req.body.mentorTurns === 'number' ? req.body.mentorTurns : 0
+  if (!runs.restore(run, { transcript, status, mentorSessionId, mentorTurns })) {
+    return res.status(409).json({ error: `cannot restore: mode=${run.mode} status=${run.status}` })
+  }
+  // Attach mentor early so session seeds are ready before the first ask.
+  mentorFor(run)
+  res.json({
+    mentorSessionId: run.mentorSessionId,
+    mentorTurns: run.mentorTurns,
+  })
 })
 
 app.post('/api/runs/:id/reveal', (req, res) => {

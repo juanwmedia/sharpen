@@ -55,6 +55,7 @@ export default {
     timeUp: 'Solución desvelada. El mentor está enseñando. Puedes seguir experimentando.',
     timeout: '⏱ Los {seconds} segundos se han ido. El mentor llega ahora, y puedes seguir tecleando.',
     revealed: 'Solución desvelada. El mentor está enseñando. Puedes seguir experimentando.',
+    restored: 'Restaurados {count} comandos de la última sesión.',
     runLost: 'El servidor de la arena se reinició y este intento se ha perdido. Te llevo de vuelta a los desafíos…',
   },
   chat: {
@@ -85,12 +86,19 @@ export default {
     solved: 'resuelto',
     revealed: 'desvelado',
     reveal: 'Desvelar solución',
+    wipe: 'Borrar progreso',
   },
   revealModal: {
     title: '¿Desvelar la solución?',
     body: 'El mentor te explicará el enfoque canónico. Puedes seguir tecleando después, pero se acaba el guardrail socrático.',
     confirm: 'Desvelar',
     cancel: 'Seguir intentando',
+  },
+  wipeModal: {
+    title: '¿Borrar el progreso de aprender?',
+    body: 'Esto limpia los comandos y la conversación del mentor guardados para este desafío. El modo desafío no se ve afectado.',
+    confirm: 'Borrar y reiniciar',
+    cancel: 'Conservar progreso',
   },
   verdict: {
     eyebrow: 'veredicto',

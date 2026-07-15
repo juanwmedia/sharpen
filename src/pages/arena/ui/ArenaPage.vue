@@ -16,7 +16,7 @@ import { lt } from '@/shared/i18n/index.ts'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const { state, startRun, leaveRun, askMentor, revealSolution } = useGame()
+const { state, startRun, leaveRun, askMentor, revealSolution, wipeLearn } = useGame()
 
 // The URL owns the challenge: /challenge/<slug> starts a fresh run on entry,
 // and an unknown slug goes home instead of showing an empty arena.
@@ -91,6 +91,7 @@ const terminalPinned = ref(true)
         :status="state.status"
         :mentor-busy="state.mentorBusy"
         @reveal="revealSolution"
+        @wipe="wipeLearn"
       />
       <VerdictPanel :checks="state.checks" />
     </aside>

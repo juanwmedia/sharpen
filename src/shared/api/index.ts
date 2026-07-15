@@ -13,7 +13,9 @@ export const apiRoutes = {
   runSubmit: (id: string) => `/api/runs/${id}/submit`,
   runAsk: (id: string) => `/api/runs/${id}/ask`,
   runReveal: (id: string) => `/api/runs/${id}/reveal`,
+  runRestore: (id: string) => `/api/runs/${id}/restore`,
   runExpire: (id: string) => `/api/runs/${id}/expire`,
+  learn: (challengeId: string) => `/api/learn/${encodeURIComponent(challengeId)}`,
 } as const
 
 export async function getJson<T>(url: string): Promise<T> {
@@ -31,4 +33,18 @@ export async function postJson<T>(url: string, body?: unknown): Promise<T> {
   })
   if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`)
   return (await res.json()) as T
+}
+
+export async function putJson(url: string, body: unknown): Promise<void> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`PUT ${url} failed: ${res.status}`)
+}
+
+export async function deleteJson(url: string): Promise<void> {
+  const res = await fetch(url, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`DELETE ${url} failed: ${res.status}`)
 }

@@ -10,10 +10,11 @@ const props = defineProps<{
   mentorBusy: boolean
 }>()
 
-const emit = defineEmits<{ reveal: [] }>()
+const emit = defineEmits<{ reveal: []; wipe: [] }>()
 
 const { t } = useI18n()
-const confirmOpen = ref(false)
+const revealOpen = ref(false)
+const wipeOpen = ref(false)
 
 const statusLabel = computed(() => {
   if (props.status === RUN_STATUS.passed) return t('learn.solved')
@@ -23,19 +24,31 @@ const statusLabel = computed(() => {
 })
 
 const canReveal = computed(() => props.status === RUN_STATUS.live)
+const inRun = computed(
+  () =>
+    props.status === RUN_STATUS.live ||
+    props.status === RUN_STATUS.passed ||
+    props.status === RUN_STATUS.revealed
+)
 
-function openConfirm(): void {
+function openReveal(): void {
   if (!canReveal.value || props.mentorBusy) return
-  confirmOpen.value = true
+  revealOpen.value = true
 }
 
-function onConfirm(): void {
-  confirmOpen.value = false
+function openWipe(): void {
+  if (!inRun.value || props.mentorBusy) return
+  wipeOpen.value = true
+}
+
+function onRevealConfirm(): void {
+  revealOpen.value = false
   emit('reveal')
 }
 
-function onCancel(): void {
-  confirmOpen.value = false
+function onWipeConfirm(): void {
+  wipeOpen.value = false
+  emit('wipe')
 }
 </script>
 
@@ -50,23 +63,43 @@ function onCancel(): void {
     >
       {{ statusLabel }}
     </div>
-    <button
-      v-if="canReveal"
-      class="cursor-pointer rounded-lg border border-[color-mix(in_srgb,var(--color-ok)_40%,var(--color-line))] bg-[color-mix(in_srgb,var(--color-ok)_12%,var(--color-surface-2))] px-3 py-2.5 font-mono text-[12.5px] text-ok transition-colors hover:border-ok disabled:cursor-not-allowed disabled:opacity-45"
-      type="button"
-      :disabled="mentorBusy"
-      @click="openConfirm"
-    >
-      {{ t('learn.reveal') }}
-    </button>
+    <div class="grid gap-2">
+      <button
+        v-if="canReveal"
+        class="cursor-pointer rounded-lg border border-[color-mix(in_srgb,var(--color-ok)_40%,var(--color-line))] bg-[color-mix(in_srgb,var(--color-ok)_12%,var(--color-surface-2))] px-3 py-2.5 font-mono text-[12.5px] text-ok transition-colors hover:border-ok disabled:cursor-not-allowed disabled:opacity-45"
+        type="button"
+        :disabled="mentorBusy"
+        @click="openReveal"
+      >
+        {{ t('learn.reveal') }}
+      </button>
+      <button
+        v-if="inRun"
+        class="cursor-pointer rounded-lg border border-line bg-transparent px-3 py-2.5 font-mono text-[12.5px] text-muted transition-colors hover:border-accent hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+        type="button"
+        :disabled="mentorBusy"
+        @click="openWipe"
+      >
+        {{ t('learn.wipe') }}
+      </button>
+    </div>
     <ConfirmModal
-      :open="confirmOpen"
+      :open="revealOpen"
       :title="t('revealModal.title')"
       :body="t('revealModal.body')"
       :confirm-label="t('revealModal.confirm')"
       :cancel-label="t('revealModal.cancel')"
-      @confirm="onConfirm"
-      @cancel="onCancel"
+      @confirm="onRevealConfirm"
+      @cancel="revealOpen = false"
+    />
+    <ConfirmModal
+      :open="wipeOpen"
+      :title="t('wipeModal.title')"
+      :body="t('wipeModal.body')"
+      :confirm-label="t('wipeModal.confirm')"
+      :cancel-label="t('wipeModal.cancel')"
+      @confirm="onWipeConfirm"
+      @cancel="wipeOpen = false"
     />
   </div>
 </template>

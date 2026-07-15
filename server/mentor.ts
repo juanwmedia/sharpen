@@ -68,6 +68,10 @@ export interface MentorOptions {
   spawnFn?: SpawnFn
   /** Language the mentor answers in. Defaults to English. */
   locale?: Locale
+  /** Resume an existing Claude Code session (learn-mode restore). */
+  sessionId?: string | null
+  /** Turns already consumed in a restored session. */
+  turns?: number
 }
 
 interface StreamEvent {
@@ -87,12 +91,14 @@ export class Mentor {
   busy = false
   queue: string[] = []
 
-  constructor({ onDelta, onDone, onError, spawnFn, locale }: MentorOptions) {
+  constructor({ onDelta, onDone, onError, spawnFn, locale, sessionId, turns }: MentorOptions) {
     this.onDelta = onDelta
     this.onDone = onDone
     this.onError = onError
     this.spawnFn = spawnFn ?? ((command, args, options) => spawn(command, args, options))
     this.locale = locale ?? DEFAULT_LOCALE
+    this.sessionId = sessionId ?? null
+    this.turns = turns ?? 0
   }
 
   // Never drop a request silently: spawning a turn takes seconds, so player

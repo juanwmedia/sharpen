@@ -9,7 +9,7 @@ import type { Run } from './runs.ts'
 const require = createRequire(import.meta.url)
 const ENGINE_VERSION = (require('../package.json') as { version: string }).version
 
-const dataDir = process.env.SHARPEN_DATA_DIR ?? join(homedir(), '.sharpen')
+export const dataDir = process.env.SHARPEN_DATA_DIR ?? join(homedir(), '.sharpen')
 const leaderboardPath = join(dataDir, 'leaderboard.json')
 const evidenceDir = join(dataDir, 'evidence')
 
