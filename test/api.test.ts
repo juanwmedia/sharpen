@@ -39,7 +39,7 @@ describe('sharpen API', () => {
     // Challenge content is bilingual: authors write every language.
     expect(typeof (first!.statement as Record<string, unknown>).en).toBe('string')
     expect(typeof (first!.statement as Record<string, unknown>).es).toBe('string')
-    expect(first!.focusCommands).toEqual(['git status', 'git clean'])
+    expect(first!.themes).toEqual(['working tree', 'untracked', 'tracked', 'staging'])
     // Summaries must not leak the solution or the executable hooks.
     expect(first).not.toHaveProperty('walkthrough')
     expect(first).not.toHaveProperty('setup')

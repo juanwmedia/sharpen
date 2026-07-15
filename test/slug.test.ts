@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { challenges, getChallengeBySlug } from '../challenges/index.ts'
+import { challenges, getChallengeByPackSlug, getChallengeBySlug } from '../challenges/index.ts'
 import { slugify } from '../challenges/slug.ts'
 
-// Slugs are public URLs (/challenge/<slug>): a broken or duplicated slug means
-// an unreachable or ambiguous challenge, so this is worth guarding.
+// Public URLs are /:pack/:slug (e.g. /git/clean-sweep). Broken or duplicated
+// pack/slug pairs mean unreachable or ambiguous scenarios.
 
 describe('challenge slugs', () => {
   it('derives URL-safe slugs from titles', () => {
@@ -12,11 +12,14 @@ describe('challenge slugs', () => {
     expect(slugify('  --weird -- title--  ')).toBe('weird-title')
   })
 
-  it('resolves every registered challenge by its slug, with no collisions', () => {
-    const slugs = challenges.map((c) => slugify(c.title))
-    expect(new Set(slugs).size).toBe(challenges.length)
+  it('resolves every registered challenge by pack and slug, with no collisions', () => {
+    const keys = challenges.map((c) => `${c.pack}/${slugify(c.title)}`)
+    expect(new Set(keys).size).toBe(challenges.length)
     for (const challenge of challenges) {
-      expect(getChallengeBySlug(slugify(challenge.title))).toBe(challenge)
+      const slug = slugify(challenge.title)
+      expect(getChallengeBySlug(slug)).toBe(challenge)
+      expect(getChallengeByPackSlug(challenge.pack, slug)).toBe(challenge)
+      expect(getChallengeByPackSlug('nope', slug)).toBeUndefined()
     }
   })
 })

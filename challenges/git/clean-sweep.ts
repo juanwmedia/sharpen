@@ -26,9 +26,8 @@ export default {
       'El archivo trackeado modificado debe conservar sus cambios, no puede quedar nada en el stage ' +
       'y el historial tiene que permanecer intacto.',
   },
-  // Commands the mentor may reference in hints. The porcelain itself decides
-  // what runs; this list feeds the challenge UI and the mentor prompt.
-  focusCommands: ['git status', 'git clean'],
+  // Concept chips: domain vocabulary, never the solving command.
+  themes: ['working tree', 'untracked', 'tracked', 'staging'],
   // Canonical solution, ONLY surfaced by the mentor after the timer expires.
   walkthrough:
     'git clean -nd first: it lists what would be swept (build.log, notes/, tmp/) without touching anything. ' +

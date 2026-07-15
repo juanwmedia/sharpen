@@ -81,8 +81,8 @@ export interface Challenge {
   difficulty: 'easy' | 'medium' | 'hard'
   timeLimitMs: number
   statement: Localized
-  /** Commands surfaced in the UI and in mentor prompts. */
-  focusCommands: string[]
+  /** Concept chips under the statement (English git vocabulary). Not solving commands. */
+  themes: string[]
   /** Canonical solution, revealed by the mentor after timeout (challenge) or
    * voluntary reveal (learn). English only: it feeds the mentor. */
   walkthrough: string
@@ -92,7 +92,7 @@ export interface Challenge {
 
 export type ChallengeSummary = Pick<
   Challenge,
-  'id' | 'pack' | 'title' | 'difficulty' | 'timeLimitMs' | 'statement' | 'focusCommands'
+  'id' | 'pack' | 'title' | 'difficulty' | 'timeLimitMs' | 'statement' | 'themes'
 >
 
 /** isomorphic-git PromiseFsClient produced by the fs bridge. */

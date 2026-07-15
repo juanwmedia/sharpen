@@ -14,14 +14,19 @@ export function getChallengeBySlug(slug: string): Challenge | undefined {
   return challenges.find((c) => slugify(c.title) === slug)
 }
 
+/** Resolve a public URL /:pack/:slug to a registered scenario. */
+export function getChallengeByPackSlug(pack: string, slug: string): Challenge | undefined {
+  return challenges.find((c) => c.pack === pack && slugify(c.title) === slug)
+}
+
 export function challengeSummaries(): ChallengeSummary[] {
-  return challenges.map(({ id, pack, title, difficulty, timeLimitMs, statement, focusCommands }) => ({
+  return challenges.map(({ id, pack, title, difficulty, timeLimitMs, statement, themes }) => ({
     id,
     pack,
     title,
     difficulty,
     timeLimitMs,
     statement,
-    focusCommands,
+    themes,
   }))
 }

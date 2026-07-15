@@ -14,7 +14,7 @@ export default {
   },
   picker: {
     eyebrow: 'pack de git',
-    title: 'Elige tu desafío',
+    title: 'Elige tu escenario',
     ledeLearn:
       'Sin reloj, un repo real en tu navegador y un mentor socrático observando. Cada {enter} valida: ejecuta un comando y la arena juzga el estado del repo que deja detrás. Desvela la solución cuando quieras el walkthrough.',
     ledeChallenge:
@@ -38,7 +38,7 @@ export default {
     best: 'mejor',
   },
   arena: {
-    back: 'Volver a los desafíos',
+    back: 'Volver a los escenarios',
   },
   terminal: {
     // {'@'} escapes the bare @, which intlify parses as a linked message.
@@ -48,15 +48,15 @@ export default {
     unpin: 'Soltar el terminal (se desplaza con la página)',
     greetingTagline: 'El repo es real. Cada Enter valida.',
     shellTip: 'Esto es la shell, no el mentor. Pregunta al mentor en la conversación de abajo; cada Enter valida el estado de tu repo.',
-    solved: '✓ Desafío resuelto. La arena validó el estado de tu repo.',
+    solved: '✓ Escenario resuelto. La arena validó el estado de tu repo.',
     notYetQuiet: '✗ todavía no: {green}/{total} checks en verde',
     notYetLoud: '✗ Todavía no. Mira el panel de veredicto. El mentor tiene una pista.',
-    alreadySolved: 'Ya está resuelto. Pregunta al mentor abajo o vuelve a por el siguiente desafío.',
+    alreadySolved: 'Ya está resuelto. Pregunta al mentor abajo o vuelve a por el siguiente escenario.',
     timeUp: 'Solución desvelada. El mentor está enseñando. Puedes seguir experimentando.',
     timeout: '⏱ Los {seconds} segundos se han ido. El mentor llega ahora, y puedes seguir tecleando.',
     revealed: 'Solución desvelada. El mentor está enseñando. Puedes seguir experimentando.',
     restored: 'Restaurados {count} comandos de la última sesión.',
-    runLost: 'El servidor de la arena se reinició y este intento se ha perdido. Te llevo de vuelta a los desafíos…',
+    runLost: 'El servidor de la arena se reinició y este intento se ha perdido. Te llevo de vuelta a los escenarios…',
   },
   chat: {
     eyebrow: 'conversación',
@@ -96,7 +96,7 @@ export default {
   },
   wipeModal: {
     title: '¿Borrar el progreso de aprender?',
-    body: 'Esto limpia los comandos y la conversación del mentor guardados para este desafío. El modo desafío no se ve afectado.',
+    body: 'Esto limpia los comandos y la conversación del mentor guardados para este escenario. El modo desafío no se ve afectado.',
     confirm: 'Borrar y reiniciar',
     cancel: 'Conservar progreso',
   },

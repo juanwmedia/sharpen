@@ -277,7 +277,7 @@ app.post('/api/runs/:id/expire', async (req, res) => {
   res.json({ recorded: true })
 })
 
-// SPA fallback: deep links like /challenge/<slug> must serve the app shell.
+// SPA fallback: deep links like /git/clean-sweep must serve the app shell.
 // express.static above already answered real files; anything else that is not
 // an API call falls through to index.html and the router takes over.
 app.get(/^\/(?!api\/).*/, (_req, res) => {

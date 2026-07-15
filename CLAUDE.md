@@ -104,9 +104,9 @@ skills/       The Claude Code plugin skill that boots the arena.
 3. `assert(ctx)`: pure state checks over `ctx.snapshot` (plus `ctx.fs` for
    file contents). Each check carries bilingual `name` and `detail`.
 4. `statement` bilingual; `walkthrough` English only (mentor source of truth
-   for the reveal); `focusCommands` for the UI chips and mentor prompts.
+   for the reveal); `themes` for soft UI concept chips (not solving commands).
 5. Register it in `challenges/index.ts`. The URL becomes
-   `/challenge/<slugify(title)>`; `test/slug.test.ts` guards collisions.
+   `/<pack>/<slugify(title)>`; `test/slug.test.ts` guards collisions.
 6. If it needs a git subcommand the porcelain lacks, extend
    `engine/porcelain/git-command.ts` with faithful output and add cases to
    `test/porcelain.test.ts`.

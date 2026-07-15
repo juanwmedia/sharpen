@@ -15,8 +15,11 @@ const { state, refreshLeaderboard } = useGame()
 
 onMounted(() => void refreshLeaderboard())
 
-function enterArena(title: string): void {
-  void router.push({ name: ROUTE_NAMES.challenge, params: { slug: slugify(title) } })
+function enterArena(c: { pack: string; title: string }): void {
+  void router.push({
+    name: ROUTE_NAMES.scenario,
+    params: { pack: c.pack, slug: slugify(c.title) },
+  })
 }
 </script>
 
@@ -38,7 +41,7 @@ function enterArena(title: string): void {
           :key="c.id"
           class="panel grid cursor-pointer gap-2 px-[22px] py-5 text-left text-ink transition-[border-color,transform] duration-150 outline-none hover:-translate-y-px hover:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line))] focus-visible:-translate-y-px focus-visible:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line))]"
           type="button"
-          @click="enterArena(c.title)"
+          @click="enterArena(c)"
         >
           <div class="flex items-baseline gap-3">
             <h3 class="m-0 font-mono text-[17px]">{{ c.title }}</h3>

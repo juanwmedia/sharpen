@@ -42,5 +42,5 @@ export const DETACHED_HEAD_LABEL = 'HEAD'
 /** Route names shared by the router table (app layer) and navigation calls. */
 export const ROUTE_NAMES = {
   picker: 'picker',
-  challenge: 'challenge',
+  scenario: 'scenario',
 } as const

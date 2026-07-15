@@ -15,7 +15,7 @@ export default {
   },
   picker: {
     eyebrow: 'git pack',
-    title: 'Pick your challenge',
+    title: 'Pick your scenario',
     ledeLearn:
       'No clock, a real repo in your browser, a Socratic mentor watching. Every {enter} validates: run a command and the arena judges the repo state it leaves behind. Reveal when you want the walkthrough.',
     ledeChallenge:
@@ -39,7 +39,7 @@ export default {
     best: 'best',
   },
   arena: {
-    back: 'Back to challenges',
+    back: 'Back to scenarios',
   },
   terminal: {
     // {'@'} is intlify's escape: a bare @ starts a linked message and breaks
@@ -50,15 +50,15 @@ export default {
     unpin: 'Unpin terminal (scrolls with the page)',
     greetingTagline: 'The repo is real. Every Enter validates.',
     shellTip: 'That is the shell, not the mentor. Ask the mentor in the conversation below; every Enter validates your repo state.',
-    solved: '✓ Challenge solved. The arena validated your repo state.',
+    solved: '✓ Scenario solved. The arena validated your repo state.',
     notYetQuiet: '✗ not yet: {green}/{total} checks green',
     notYetLoud: '✗ Not yet. Check the verdict panel. The mentor has a hint.',
-    alreadySolved: 'Already solved. Ask the mentor below, or go back for the next challenge.',
+    alreadySolved: 'Already solved. Ask the mentor below, or go back for the next scenario.',
     timeUp: 'Solution revealed. The mentor is teaching. You can keep experimenting.',
     timeout: '⏱ {seconds} seconds are gone. Mentor incoming, and you can keep typing.',
     revealed: 'Solution revealed. The mentor is teaching. You can keep experimenting.',
     restored: 'Restored {count} commands from last session.',
-    runLost: 'The arena server restarted and this run is gone. Taking you back to the challenges…',
+    runLost: 'The arena server restarted and this run is gone. Taking you back to the scenarios…',
   },
   chat: {
     eyebrow: 'conversation',
@@ -98,7 +98,7 @@ export default {
   },
   wipeModal: {
     title: 'Wipe learn progress?',
-    body: 'This clears your saved commands and mentor conversation for this challenge. Challenge mode is unaffected.',
+    body: 'This clears your saved commands and mentor conversation for this scenario. Challenge mode is unaffected.',
     confirm: 'Wipe and restart',
     cancel: 'Keep progress',
   },

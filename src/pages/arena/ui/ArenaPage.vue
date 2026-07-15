@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { getChallengeBySlug } from '@challenges/index.ts'
+import { getChallengeByPackSlug } from '@challenges/index.ts'
 import { registerRunLostHandler, useGame } from '@/entities/game/index.ts'
 import { Chip } from '@/shared/ui/index.ts'
 import { LearnPanel } from '@/widgets/learn-panel/index.ts'
@@ -18,10 +18,13 @@ const route = useRoute()
 const router = useRouter()
 const { state, startRun, leaveRun, askMentor, revealSolution, wipeLearn } = useGame()
 
-// The URL owns the challenge: /challenge/<slug> starts a fresh run on entry,
-// and an unknown slug goes home instead of showing an empty arena.
+// The URL owns the scenario: /:pack/:slug (e.g. /git/clean-sweep) starts a
+// run on entry; an unknown pack/slug goes home instead of an empty arena.
 onMounted(() => {
-  const challenge = getChallengeBySlug(String(route.params.slug ?? ''))
+  const challenge = getChallengeByPackSlug(
+    String(route.params.pack ?? ''),
+    String(route.params.slug ?? '')
+  )
   if (!challenge) {
     void router.replace({ name: ROUTE_NAMES.picker })
     return
@@ -63,7 +66,7 @@ const terminalPinned = ref(true)
         </div>
         <p class="mt-1 mb-2.5 text-muted">{{ lt(state.challenge.statement) }}</p>
         <div class="flex flex-wrap gap-2">
-          <Chip v-for="cmd in state.challenge.focusCommands" :key="cmd" tone="ink">{{ cmd }}</Chip>
+          <Chip v-for="theme in state.challenge.themes" :key="theme" tone="ink">{{ theme }}</Chip>
         </div>
       </div>
       <div :class="{ 'sticky top-3 z-10': terminalPinned }">
