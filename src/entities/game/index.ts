@@ -1,5 +1,6 @@
 export {
   execCommand,
+  livePrompt,
   onCommand,
   registerRunLostHandler,
   registerTerminalWriter,

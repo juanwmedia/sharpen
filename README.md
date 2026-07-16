@@ -1,12 +1,13 @@
-# sharpen
+<p align="center">
+  <a href="https://frontendleap.com"><img src="public/brand/mark.svg" width="72" alt="FrontendLeap logo" /></a>
+</p>
 
-Timed Git challenges in your browser, with a Socratic AI mentor. A Claude Code
-plugin.
+<h1 align="center">sharpen</h1>
 
-You get 60 seconds, a real Git repository running entirely in your browser, and
-a mentor who watches every command. Fail a validation and the mentor nudges you
-with a question, never the answer. Run out of time and it teaches you the
-solution properly. Solve it and you climb the leaderboard.
+<p align="center">
+  Timed Git challenges in your browser, with a Socratic AI mentor.<br />
+  A Claude Code plugin by <a href="https://frontendleap.com">FrontendLeap</a>.
+</p>
 
 ## Install
 
@@ -15,9 +16,11 @@ solution properly. Solve it and you climb the leaderboard.
 /plugin install sharpen@sharpen
 ```
 
-Then run `/sharpen` in any Claude Code session. The skill starts a local server
-and opens the arena in your browser. Each challenge has its own URL
-(`/challenge/clean-sweep`), so you can deep-link straight into a run.
+Then run `/sharpen` in any Claude Code session. The first boot installs
+dependencies and builds the arena (about 2 minutes, the skill handles it);
+after that it just starts a local server and opens the arena in your browser.
+Each scenario has its own URL (`/git/clean-sweep`), so you can deep-link
+straight into a run.
 
 ## Requirements
 
@@ -26,6 +29,33 @@ and opens the arena in your browser. Each challenge has its own URL
   `claude -p` process on your machine, using your account; model defaults to
   `sonnet`, override with `SHARPEN_MENTOR_MODEL=haiku`)
 - `gh` CLI (only for the shared ranking, coming in v2)
+
+## The core loop
+
+Every scenario is the same ritual, and the ritual is the product:
+
+1. **Read the briefing.** A real situation, the file tree it left behind, and
+   one objective. The check rubric is on the table before you start, so you
+   always know what "solved" means.
+2. **Press Start and type real git.** The repo is real and runs entirely in
+   your browser: `git status` tells you the truth, pipes and `rm -rf` work,
+   and wrong moves have consequences.
+3. **Every Enter validates.** Each command you run makes the server replay
+   your whole transcript with the same engine and re-judge the final state of
+   the repo. The verdict panel flips check by check as you close in.
+4. **The mentor watches, Socratically.** Stuck? Ask. Fail a check? It nudges.
+   While you are live it answers with questions and concepts, never with the
+   solving command. You do the thinking; that is the whole pedagogy.
+5. **Solve it, or learn it.** Pass and your speed becomes your score. Run out
+   of clock and the mentor drops the guardrail and teaches the canonical
+   walkthrough properly. Either way you leave knowing more git than you came
+   with.
+
+Two ways to play, one switch in the top bar:
+
+- **Challenge:** 60 seconds, a score, a local leaderboard. The adrenaline mode.
+- **Learn:** no clock, no ranking. Progress persists between sessions and you
+  decide when to reveal the solution. The mastery mode.
 
 ## Languages
 
@@ -36,7 +66,7 @@ written in both languages by the challenge author and the type system enforces
 it; the ASCII tree and titles/URL slugs stay in English, and the emulated git
 speaks English like the real one.
 
-## How it works
+## Under the hood
 
 ```
 Browser (SPA)                        Local server (Node)

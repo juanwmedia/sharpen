@@ -3,6 +3,7 @@
 export default {
   app: {
     engine: 'engine {version}',
+    byline: 'by FrontendLeap',
   },
   lang: {
     label: 'Idioma',

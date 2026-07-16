@@ -1,7 +1,8 @@
-/* sharpen arena: terminal-forge identity, ember accent on steel blue-black,
-   monospace display voice. Deliberately dark-only: this is the arena at night.
-   Tailwind 4 CSS-first config: every color/font/animation below is a design
-   token; components consume them as utilities (bg-surface, text-muted...). */
+/* Sharpen by FrontendLeap: terminal-forge identity, FrontendLeap sky-blue
+   accent on steel blue-black, monospace display voice. Deliberately dark-only:
+   this is the arena at night. Tailwind 4 CSS-first config: every
+   color/font/animation below is a design token; components consume them as
+   utilities (bg-surface, text-muted...). */
 
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
@@ -16,8 +17,9 @@
   --color-faint: #5d6a7e;
   --color-line: rgb(148 161 181 / 0.16);
   --color-line-strong: rgb(148 161 181 / 0.22);
-  --color-accent: #ff5a2e;
-  --color-accent-soft: rgb(255 90 46 / 0.12);
+  /* The accent is FrontendLeap sky blue (brand mark: public/brand/mark.svg). */
+  --color-accent: #00a3ff;
+  --color-accent-soft: rgb(0 163 255 / 0.12);
   --color-ok: #46c05b;
   --color-warn: #e3a72f;
   --color-err: #ff5c57;
@@ -123,7 +125,7 @@
     box-shadow: none;
   }
   /* The cursor invites typing even before the terminal has focus: dim blink
-     unfocused, solid ember blink focused. */
+     unfocused, solid accent blink focused. */
   #terminal.wterm.cursor-blink .term-cursor {
     animation: cursor-blink 1.1s step-end infinite;
   }

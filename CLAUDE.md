@@ -90,6 +90,14 @@ skills/       The Claude Code plugin skill that boots the arena.
   components; use the token utilities (`bg-surface`, `text-muted`,
   `rounded-panel`, `animate-*`). Plain CSS is allowed only in the components
   layer for third-party DOM (wterm) and the shared `.panel` surface.
+- Brand: **Sharpen by FrontendLeap** (frontendleap.com). The accent
+  (`--color-accent`) is FrontendLeap sky blue. The FL mark (three concentric
+  circles) has ONE source: `public/brand/mark.svg`, referenced by the topbar
+  byline (`App.vue`), the favicon (`index.html`) and the README logo; source
+  assets live in the fl-next repo. The topbar byline links to
+  `FRONTENDLEAP_URL` from `src/shared/config`. Playing never requires a
+  FrontendLeap account: the platform is brand and (v2) optional global
+  ranking, never a gate.
 - Terminal geometry is fixed (`TERMINAL_COLS`/`TERMINAL_ROWS`, autoResize
   false): 20 rows exactly fill the frame so a fresh terminal shows no
   scrollbar. ANSI codes come from `@/shared/lib/ansi.ts`.
@@ -128,6 +136,11 @@ checklist). Canonical example: `challenges/git/clean-sweep/`.
 - The server serves `dist/`, so UI changes need `npm run build`. Restarting
   the server kills in-memory runs: say so before doing it. `SHARPEN_PORT`
   and `SHARPEN_DATA_DIR` override defaults (tests use a temp data dir).
+- Every release bumps `version` in `.claude-plugin/plugin.json` (keep
+  `package.json` in sync): `/plugin update` only refreshes installed copies
+  when the version changes. `dist/` stays out of git on purpose; the launch
+  skill builds it on the player's machine, so `tsx` and everything `npm
+  start` touches must live in `dependencies`, never `devDependencies`.
 - Browser verification happens in isolated contexts (chrome-devtools
   `isolatedContext`), never in the user's tab. If a verification run records
   a result, remove its entry from `~/.sharpen/leaderboard.json` and its file

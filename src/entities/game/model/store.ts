@@ -115,8 +115,9 @@ function historyPrompt(): string {
   return `${ansi.dim('➜')} ${ansi.dim('repo')} ${ansi.dim('git:(')}${ansi.dim(state.branch)}${ansi.dim(')')} `
 }
 
-function livePrompt(): string {
-  return `${ansi.ember('➜')} ${ansi.cyan('repo')} ${ansi.dim('git:(')}${ansi.red(state.branch)}${ansi.dim(')')} `
+/** The one place the live prompt is built; TerminalPane reuses it. */
+export function livePrompt(): string {
+  return `${ansi.brand('➜')} ${ansi.cyan('repo')} ${ansi.dim('git:(')}${ansi.red(state.branch)}${ansi.dim(')')} `
 }
 
 /** Stored output is stdout+stderr concatenated; paint the common error cases red. */

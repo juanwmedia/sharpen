@@ -39,6 +39,9 @@ export const LEARN_SAVE_DEBOUNCE_MS = 400
 /** Prompt label when the repo is not on any branch (detached HEAD). */
 export const DETACHED_HEAD_LABEL = 'HEAD'
 
+/** Home of the brand this arena belongs to (topbar byline link). */
+export const FRONTENDLEAP_URL = 'https://frontendleap.com'
+
 /** Route names shared by the router table (app layer) and navigation calls. */
 export const ROUTE_NAMES = {
   picker: 'picker',

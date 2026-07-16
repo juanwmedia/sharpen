@@ -8,8 +8,8 @@ export const ansi = {
   green: wrap('32'),
   yellow: wrap('33'),
   cyan: wrap('36'),
-  /** 256-color ember, the brand accent. */
-  ember: wrap('38;5;209'),
+  /** 256-color sky blue, the FrontendLeap brand accent. */
+  brand: wrap('38;5;39'),
   /** 256-color gray used for de-emphasized lines. */
   dim: wrap('38;5;245'),
 } as const

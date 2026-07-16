@@ -2,7 +2,7 @@
 import { WTerm } from '@wterm/dom'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { execCommand, onCommand, registerTerminalWriter, submit, tabCandidates, useGame } from '@/entities/game/index.ts'
+import { execCommand, livePrompt, onCommand, registerTerminalWriter, submit, tabCandidates } from '@/entities/game/index.ts'
 import { TERMINAL_COLS, TERMINAL_ROWS } from '@/shared/config/index.ts'
 import { ansi } from '@/shared/lib/ansi.ts'
 import { TermShell } from '@/shared/lib/bash-shell.ts'
@@ -11,7 +11,6 @@ const props = defineProps<{ challengeTitle: string; pinned?: boolean }>()
 defineEmits<{ 'toggle-pin': [] }>()
 
 const { t } = useI18n()
-const { state } = useGame()
 const host = ref<HTMLElement | null>(null)
 let term: WTerm | null = null
 
@@ -28,8 +27,8 @@ onMounted(async () => {
     onCommand,
     onSubmit: () => submit(),
     tabCandidates,
-    prompt: () => `${ansi.ember('➜')} ${ansi.cyan('repo')} ${ansi.dim('git:(')}${ansi.red(state.branch)}${ansi.dim(')')} `,
-    greeting: [`${ansi.ember('sharpen arena')} · ${props.challengeTitle}`, ansi.dim(t('terminal.greetingTagline')), ''],
+    prompt: livePrompt,
+    greeting: [`${ansi.brand('sharpen arena')} · ${props.challengeTitle}`, ansi.dim(t('terminal.greetingTagline')), ''],
   })
   term.onData = (data: string) => void shell.handleInput(data)
   shell.attach((data) => term?.write(data))
