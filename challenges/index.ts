@@ -1,4 +1,4 @@
-import cleanSweep from './git/clean-sweep.ts'
+import cleanSweep from './git/clean-sweep/index.ts'
 import { slugify } from './slug.ts'
 import type { Challenge, ChallengeSummary } from '../engine/types.ts'
 

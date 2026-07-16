@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "start": "tsx server/index.ts",
+    "start": "tsx --import ./challenges/package/register-md.ts server/index.ts",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit"
   },
@@ -18,7 +18,8 @@
     "just-bash": "^2.14.5",
     "vue": "^3.5.39",
     "vue-i18n": "^11.4.6",
-    "vue-router": "^5.1.0"
+    "vue-router": "^5.1.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.20",

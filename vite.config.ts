@@ -2,9 +2,10 @@ import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
+import { mdAsModulePlugin } from './challenges/package/md-vite-plugin.ts'
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [mdAsModulePlugin(), vue(), tailwindcss()],
   resolve: {
     alias: {
       // just-bash's browser bundle references node:zlib for its gzip

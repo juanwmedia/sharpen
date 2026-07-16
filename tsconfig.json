@@ -19,6 +19,14 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "engine/**/*", "server/**/*", "challenges/**/*", "test/**/*", "vite.config.ts"],
+  "include": [
+    "src/**/*",
+    "engine/**/*",
+    "server/**/*",
+    "challenges/**/*",
+    "test/**/*",
+    "vite.config.ts",
+    "challenges/package/md-shim.d.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

@@ -89,10 +89,10 @@ npm test           # vitest: porcelain, verdicts, fs bridge, mentor queue, API, 
 npm run typecheck  # vue-tsc --noEmit
 ```
 
-To add a challenge: create `challenges/<pack>/<name>.ts` exporting an object
-that `satisfies Challenge` (deterministic `setup`, state-based `assert`,
-bilingual `briefing`/`objective` and check texts, English `tree`), then register
-it in `challenges/index.ts`. Its URL becomes `/<pack>/<slug-of-title>`.
+To add a challenge: create a package folder `challenges/<pack>/<name>/` with
+`scenario.md` (schema 1 frontmatter + bilingual sections), `walkthrough.md`,
+`setup.ts`, and `assert.ts`, then register it in `challenges/index.ts`. See
+`challenges/package/FORMAT.md`. Its URL becomes `/<pack>/<slug-of-title>`.
 
 Architecture, contracts and conventions live in `CLAUDE.md`. Verified
 third-party API facts (just-bash, isomorphic-git, wterm, claude CLI, vue-i18n)

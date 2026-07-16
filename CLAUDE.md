@@ -22,7 +22,7 @@ engine/       Deterministic git arena. Framework-agnostic: runs in the
   fs-bridge.ts just-bash IFileSystem -> isomorphic-git PromiseFsClient.
 server/       Express + SSE. Authoritative timer, transcript replay,
               evidence + leaderboard (~/.sharpen/), mentor process spawner.
-challenges/   Registry (index.ts) + one file per challenge + slug.ts.
+challenges/   Registry + schema-1 packages (see package/FORMAT.md) + slug.ts.
 src/          Vue 3 SPA, Feature-Sliced Design (see below).
 test/         Vitest. Run with `npm test`.
 skills/       The Claude Code plugin skill that boots the arena.
@@ -96,16 +96,22 @@ skills/       The Claude Code plugin skill that boots the arena.
 
 ## Adding a challenge
 
-1. Create `challenges/<pack>/<name>.ts`, default-export an object that
-   `satisfies Challenge`.
+Scenarios are **packages** (folder + schema 1). **Source of truth for authors
+and agents:** `challenges/package/FORMAT.md` (layout, file roles, boilerplate,
+checklist). Canonical example: `challenges/git/clean-sweep/`.
+
+1. Copy `challenges/git/clean-sweep/` to `challenges/<pack>/<name>/` and edit
+   `scenario.md`, `walkthrough.md`, `setup.ts`, `assert.ts` (keep `index.ts`
+   wiring via `assembleScenario`).
 2. `setup(env)`: build the repo with the env helpers (write/add/commit/
    branch/checkout). It must be deterministic; the fixed clock and author
    come from the arena.
 3. `assert(ctx)`: pure state checks over `ctx.snapshot` (plus `ctx.fs` for
-   file contents). Each check carries bilingual `name` and `detail`.
-4. `briefing` + `objective` bilingual; `tree` English ASCII snapshot; `walkthrough`
-   English only (mentor source of truth for the reveal); `themes` for soft UI
-   concept chips (not solving commands).
+   file contents). Each check carries bilingual `name` and `detail`. Never
+   inspect the typed transcript.
+4. Copy lives in `scenario.md` (bilingual Briefing/Objective sections) and
+   `spec.tree` for git; `walkthrough.md` is English only (mentor reveal);
+   `themes` are soft UI concept chips (not solving commands).
 5. Register it in `challenges/index.ts`. The URL becomes
    `/<pack>/<slugify(title)>`; `test/slug.test.ts` guards collisions.
 6. If it needs a git subcommand the porcelain lacks, extend

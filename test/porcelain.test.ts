@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createArena } from '../engine/arena.ts'
-import challenge from '../challenges/git/clean-sweep.ts'
+import challenge from '../challenges/git/clean-sweep/index.ts'
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
 
