@@ -4,7 +4,18 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import express from 'express'
 import { challengeSummaries, getChallenge } from '../challenges/index.ts'
-import { ARENA_EVENT, DEFAULT_LOCALE, DEFAULT_RUN_MODE, LOCALES, MENTOR_BUBBLE, RUN_MODES, type MentorBubble } from '../engine/types.ts'
+import { formatBoard } from '../engine/board.ts'
+import {
+  ARENA_EVENT,
+  DEFAULT_LOCALE,
+  DEFAULT_RUN_MODE,
+  LOCALES,
+  MENTOR_BUBBLE,
+  RUN_MODES,
+  type Check,
+  type MentorBubble,
+  type Snapshot,
+} from '../engine/types.ts'
 import {
   deleteLearn,
   LEARN_STATUSES,
@@ -12,7 +23,15 @@ import {
   parseLearnSnapshot,
   saveLearn,
 } from './learn.ts'
-import { Mentor, followUpPrompt, hintPrompt, liveQuestionPrompt, praisePrompt, revealPrompt } from './mentor.ts'
+import {
+  Mentor,
+  MENTOR_HOW_CLOSED,
+  MENTOR_PHASE,
+  MENTOR_TRIGGER,
+  buildMentorPrompt,
+  type MentorHowClosed,
+  type MentorTrigger,
+} from './mentor.ts'
 import { RUN_STATUS, RunStore, type Run, type TranscriptEntry } from './runs.ts'
 import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
 
@@ -99,6 +118,56 @@ function askMentor(
   return accepted
 }
 
+function mentorPromptFor(
+  run: Run,
+  trigger: MentorTrigger,
+  {
+    snapshot,
+    checks,
+    playerQuestion,
+    durationSec,
+  }: {
+    snapshot: Snapshot
+    checks: Check[]
+    playerQuestion?: string
+    durationSec?: number
+  }
+): string {
+  const open = run.status === RUN_STATUS.live || run.status === RUN_STATUS.ready
+  const howClosed: MentorHowClosed | undefined =
+    run.status === RUN_STATUS.passed
+      ? MENTOR_HOW_CLOSED.passed
+      : run.status === RUN_STATUS.revealed
+        ? MENTOR_HOW_CLOSED.revealed
+        : undefined
+  return buildMentorPrompt({
+    phase: open ? MENTOR_PHASE.open : MENTOR_PHASE.closed,
+    howClosed,
+    trigger,
+    challenge: run.challenge,
+    board: formatBoard(snapshot),
+    transcript: run.transcript,
+    checks,
+    clockSec: open && run.deadline != null ? Math.max(0, (run.deadline - Date.now()) / 1000) : null,
+    durationSec,
+    playerQuestion,
+  })
+}
+
+async function mentorFromInspect(
+  run: Run,
+  trigger: MentorTrigger,
+  opts?: { playerQuestion?: string; bubble?: MentorBubble; coalesce?: boolean }
+): Promise<boolean> {
+  const { snapshot, verdict } = await runs.inspect(run)
+  const prompt = mentorPromptFor(run, trigger, {
+    snapshot,
+    checks: verdict.checks,
+    playerQuestion: opts?.playerQuestion,
+  })
+  return askMentor(run, prompt, { bubble: opts?.bubble, coalesce: opts?.coalesce })
+}
+
 app.get('/api/meta', async (_req, res) => {
   res.json({ engineVersion: ENGINE_VERSION, player: await defaultPlayer() })
 })
@@ -168,7 +237,7 @@ app.post('/api/runs/:id/start', (req, res) => {
   runs.start(run, (timedOut) => {
     slog(`run=${timedOut.id} timeout`)
     runs.emit(timedOut, ARENA_EVENT.timeout, {})
-    askMentor(timedOut, revealPrompt(timedOut), { bubble: MENTOR_BUBBLE.reveal })
+    void mentorFromInspect(timedOut, MENTOR_TRIGGER.timeout, { bubble: MENTOR_BUBBLE.reveal })
   })
   slog(`run=${run.id} started player=${run.player} challenge=${run.challengeId} mode=${run.mode}`)
   res.json({ startedAt: run.startedAt, deadline: run.deadline, mode: run.mode, status: run.status })
@@ -201,14 +270,14 @@ app.post('/api/runs/:id/restore', (req, res) => {
   })
 })
 
-app.post('/api/runs/:id/reveal', (req, res) => {
+app.post('/api/runs/:id/reveal', async (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
   if (!runs.reveal(run)) {
     return res.status(409).json({ error: `cannot reveal: mode=${run.mode} status=${run.status}` })
   }
   slog(`run=${run.id} reveal`)
-  askMentor(run, revealPrompt(run), { bubble: MENTOR_BUBBLE.reveal })
+  await mentorFromInspect(run, MENTOR_TRIGGER.reveal, { bubble: MENTOR_BUBBLE.reveal })
   res.status(204).end()
 })
 
@@ -226,7 +295,7 @@ app.post('/api/runs/:id/submit', async (req, res) => {
   if (!run) return res.status(404).json({ error: 'unknown run' })
   if (run.status !== RUN_STATUS.live) return res.status(409).json({ error: `run is ${run.status}` })
 
-  const verdict = await runs.submit(run)
+  const { snapshot, verdict } = await runs.submit(run)
   runs.emit(run, ARENA_EVENT.verdict, { pass: verdict.pass, checks: verdict.checks, attempts: run.attempts })
 
   if (verdict.pass) {
@@ -235,16 +304,19 @@ app.post('/api/runs/:id/submit', async (req, res) => {
       await recordResult(evidence)
       runs.emit(run, ARENA_EVENT.leaderboardUpdated, {})
     }
-    askMentor(run, praisePrompt({ challenge: run.challenge, durationMs: Date.now() - (run.startedAt ?? Date.now()) }))
+    const durationSec = (Date.now() - (run.startedAt ?? Date.now())) / 1000
+    askMentor(
+      run,
+      mentorPromptFor(run, MENTOR_TRIGGER.submitPass, {
+        snapshot,
+        checks: verdict.checks,
+        durationSec,
+      })
+    )
   } else {
     askMentor(
       run,
-      hintPrompt({
-        challenge: run.challenge,
-        transcript: run.transcript,
-        verdict,
-        remainingMs: run.deadline != null ? Math.max(0, run.deadline - Date.now()) : null,
-      }),
+      mentorPromptFor(run, MENTOR_TRIGGER.submitFail, { snapshot, checks: verdict.checks }),
       { coalesce: true }
     )
   }
@@ -252,15 +324,13 @@ app.post('/api/runs/:id/submit', async (req, res) => {
   res.json({ pass: verdict.pass, checks: verdict.checks })
 })
 
-// Chat works in every phase. Mid-run questions get the Socratic guardrail
-// (nudges only); after pass/reveal the mentor answers plainly.
-app.post('/api/runs/:id/ask', (req, res) => {
+// Chat: same Open/Closed context as other turns; trigger is chat.
+app.post('/api/runs/:id/ask', async (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
   const question = String(req.body?.question ?? '').slice(0, QUESTION_MAX_CHARS)
   if (!question.trim()) return res.status(400).json({ error: 'empty question' })
-  const prompt = run.status === RUN_STATUS.live ? liveQuestionPrompt(question) : followUpPrompt(question)
-  const accepted = askMentor(run, prompt)
+  const accepted = await mentorFromInspect(run, MENTOR_TRIGGER.chat, { playerQuestion: question })
   res.status(accepted ? 202 : 429).json({ accepted })
 })
 
@@ -270,7 +340,7 @@ app.post('/api/runs/:id/expire', async (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
   if (run.status !== RUN_STATUS.revealed) return res.status(409).json({ error: `run is ${run.status}` })
-  const verdict = await runs.submit(run)
+  const { verdict } = await runs.submit(run)
   const evidence = await saveEvidence(run, verdict)
   await recordResult(evidence)
   runs.emit(run, ARENA_EVENT.leaderboardUpdated, {})

@@ -1,4 +1,4 @@
-import { statusOf, untrackedFiles } from '../../../engine/snapshot.ts'
+import { FILE_STATUS, statusOf, untrackedFiles } from '../../../engine/snapshot.ts'
 import type { ChallengeAssertContext, Check } from '../../../engine/types.ts'
 import { DIRTY_CLIENT } from './setup.ts'
 
@@ -39,16 +39,16 @@ export async function assert({
       en: 'Work in progress survived, unstaged',
       es: 'El trabajo en curso sobrevivió, fuera del stage',
     },
-    pass: clientState === 'modified' && clientContent === DIRTY_CLIENT,
+    pass: clientState === FILE_STATUS.modified && clientContent === DIRTY_CLIENT,
     detail:
-      clientState === 'modified'
+      clientState === FILE_STATUS.modified
         ? {
             en: 'src/api/client.ts still carries your uncommitted change',
             es: 'src/api/client.ts conserva tu cambio sin commitear',
           }
         : {
-            en: `src/api/client.ts is ${clientState} (expected: modified, unstaged)`,
-            es: `src/api/client.ts está ${clientState} (esperado: modified, sin stage)`,
+            en: `src/api/client.ts is ${clientState} (expected: ${FILE_STATUS.modified}, unstaged)`,
+            es: `src/api/client.ts está ${clientState} (esperado: ${FILE_STATUS.modified}, sin stage)`,
           },
   })
 

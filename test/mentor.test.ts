@@ -1,8 +1,30 @@
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
-import { MAX_TURNS, Mentor } from '../server/mentor.ts'
+import cleanSweep from '../challenges/git/clean-sweep/index.ts'
+import {
+  buildMentorPrompt,
+  MAX_TURNS,
+  Mentor,
+  MENTOR_HOW_CLOSED,
+  MENTOR_PHASE,
+  MENTOR_PROMPT,
+  MENTOR_TRIGGER,
+} from '../server/mentor.ts'
 import type { SpawnFn } from '../server/mentor.ts'
+
+const boardSample = `branch: main
+untracked: build.log, notes/ideas.md
+modified: src/api/client.ts
+staged: (none)`
+
+const failChecks = [
+  {
+    name: { en: 'No untracked files remain', es: 'x' },
+    pass: false,
+    detail: { en: 'still untracked: build.log', es: 'x' },
+  },
+]
 
 // EventEmitter-based fake of the spawned claude CLI: real streams so the
 // mentor's readline wiring is exercised, no real process.
@@ -151,5 +173,80 @@ describe('Mentor queue', () => {
     // The failure freed the slot: the queued question runs next.
     expect(children).toHaveLength(2)
     expect(children[1]!.stdinData).toBe('q2')
+  })
+})
+
+describe('buildMentorPrompt', () => {
+  it('Open + chat includes board and objective, never walkthrough', () => {
+    const prompt = buildMentorPrompt({
+      phase: MENTOR_PHASE.open,
+      trigger: MENTOR_TRIGGER.chat,
+      challenge: cleanSweep,
+      board: boardSample,
+      transcript: [],
+      checks: [],
+      clockSec: null,
+      playerQuestion: 'hola',
+    })
+    expect(prompt).toContain(MENTOR_PROMPT.openAttempt)
+    expect(prompt).toContain(MENTOR_PROMPT.boardAuthoritative)
+    expect(prompt).toContain(cleanSweep.title)
+    expect(prompt).toContain(cleanSweep.objective.en.slice(0, 40))
+    expect(prompt).toContain(MENTOR_PROMPT.repoBoard)
+    expect(prompt).toContain('untracked: build.log')
+    expect(prompt).toContain(MENTOR_PROMPT.nothingTyped)
+    expect(prompt).toContain('hola')
+    expect(prompt).not.toContain(cleanSweep.walkthrough.slice(0, 30))
+    expect(prompt).not.toContain(MENTOR_PROMPT.walkthrough)
+  })
+
+  it('Open + submitFail includes failed checks and board', () => {
+    const prompt = buildMentorPrompt({
+      phase: MENTOR_PHASE.open,
+      trigger: MENTOR_TRIGGER.submitFail,
+      challenge: cleanSweep,
+      board: boardSample,
+      transcript: [{ command: 'git status', output: '...' }],
+      checks: failChecks,
+      clockSec: 42,
+    })
+    expect(prompt).toContain('Validation failed')
+    expect(prompt).toContain(`${MENTOR_PROMPT.checkFail} No untracked files remain`)
+    expect(prompt).toContain('$ git status')
+    expect(prompt).toContain('42s left')
+    expect(prompt).toContain(MENTOR_PROMPT.repoBoard)
+  })
+
+  it('Closed + revealed includes walkthrough and howClosed', () => {
+    const prompt = buildMentorPrompt({
+      phase: MENTOR_PHASE.closed,
+      howClosed: MENTOR_HOW_CLOSED.revealed,
+      trigger: MENTOR_TRIGGER.reveal,
+      challenge: cleanSweep,
+      board: boardSample,
+      transcript: [],
+      checks: failChecks,
+    })
+    expect(prompt).toContain(MENTOR_PROMPT.closedAttempt)
+    expect(prompt).toContain(`${MENTOR_PROMPT.howClosedKey}: ${MENTOR_HOW_CLOSED.revealed}`)
+    expect(prompt).toContain(MENTOR_PROMPT.walkthrough)
+    expect(prompt).toContain(cleanSweep.walkthrough.slice(0, 40))
+  })
+
+  it('Closed + passed includes walkthrough, passed, and duration', () => {
+    const prompt = buildMentorPrompt({
+      phase: MENTOR_PHASE.closed,
+      howClosed: MENTOR_HOW_CLOSED.passed,
+      trigger: MENTOR_TRIGGER.submitPass,
+      challenge: cleanSweep,
+      board: boardSample,
+      transcript: [{ command: 'git clean -fd' }],
+      checks: failChecks.map((c) => ({ ...c, pass: true, detail: { en: 'ok', es: 'ok' } })),
+      durationSec: 12,
+    })
+    expect(prompt).toContain(`${MENTOR_PROMPT.howClosedKey}: ${MENTOR_HOW_CLOSED.passed}`)
+    expect(prompt).toContain('Solved in 12s')
+    expect(prompt).toContain(MENTOR_PROMPT.walkthrough)
+    expect(prompt).toContain('Congratulate briefly')
   })
 })

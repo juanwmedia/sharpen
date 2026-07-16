@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Response } from 'express'
 import { createArena } from '../engine/arena.ts'
 import { getChallenge } from '../challenges/index.ts'
+import type { Snapshot } from '../engine/types.ts'
 import {
   ARENA_EVENT,
   DEFAULT_LOCALE,
@@ -190,20 +191,31 @@ export class RunStore {
     run.transcript.push({ command, output: String(output ?? '').slice(0, TRANSCRIPT_OUTPUT_MAX_CHARS) })
   }
 
-  // Authoritative verdict: fresh arena + transcript replay. Deterministic by
-  // construction (fixed clocks), so browser and server always agree.
-  async submit(run: Run): Promise<Verdict> {
-    run.attempts += 1
+  /** Replay transcript into a fresh arena. No attempt counter / status side effects. */
+  async replay(run: Run): Promise<{ snapshot: Snapshot; verdict: Verdict }> {
     const arena = await createArena(run.challenge)
     for (const { command } of run.transcript) {
       await arena.exec(command)
     }
-    const verdict = await arena.verdict()
-    if (verdict.pass && run.status === RUN_STATUS.live) {
+    const [snapshot, verdict] = await Promise.all([arena.snapshot(), arena.verdict()])
+    return { snapshot, verdict }
+  }
+
+  /** Mentor context: current board + checks without counting a submit. */
+  async inspect(run: Run): Promise<{ snapshot: Snapshot; verdict: Verdict }> {
+    return this.replay(run)
+  }
+
+  // Authoritative verdict: fresh arena + transcript replay. Deterministic by
+  // construction (fixed clocks), so browser and server always agree.
+  async submit(run: Run): Promise<{ snapshot: Snapshot; verdict: Verdict }> {
+    run.attempts += 1
+    const result = await this.replay(run)
+    if (result.verdict.pass && run.status === RUN_STATUS.live) {
       clearTimeout(run.timer ?? undefined)
       run.status = RUN_STATUS.passed
     }
-    return verdict
+    return result
   }
 
   finish(run: Run): void {

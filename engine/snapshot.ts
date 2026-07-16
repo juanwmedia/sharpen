@@ -51,18 +51,31 @@ export async function stateHash(snapshot: Snapshot): Promise<string> {
     .join('')
 }
 
+/** Path status labels returned by statusOf (shared by assert helpers and board). */
+export const FILE_STATUS = {
+  absent: 'absent',
+  untracked: 'untracked',
+  unmodified: 'unmodified',
+  modified: 'modified',
+  staged: 'staged',
+  deleted: 'deleted',
+  deletedStaged: 'deleted-staged',
+  other: 'other',
+} as const
+export type FileStatus = (typeof FILE_STATUS)[keyof typeof FILE_STATUS]
+
 // Convenience accessors so challenge assert() functions stay readable.
-export function statusOf(snapshot: Snapshot, filepath: string): string {
+export function statusOf(snapshot: Snapshot, filepath: string): FileStatus {
   const row = snapshot.status.find(([file]) => file === filepath)
-  if (!row) return 'absent'
+  if (!row) return FILE_STATUS.absent
   const [, headState, workdir, stage] = row
-  if (headState === 0 && workdir === 2 && stage === 0) return 'untracked'
-  if (headState === 1 && workdir === 1 && stage === 1) return 'unmodified'
-  if (workdir === 2 && stage === 1) return 'modified'
-  if (workdir === 2 && stage >= 2) return 'staged'
-  if (workdir === 0 && stage === 0 && headState === 1) return 'deleted-staged'
-  if (workdir === 0 && headState === 1) return 'deleted'
-  return 'other'
+  if (headState === 0 && workdir === 2 && stage === 0) return FILE_STATUS.untracked
+  if (headState === 1 && workdir === 1 && stage === 1) return FILE_STATUS.unmodified
+  if (workdir === 2 && stage === 1) return FILE_STATUS.modified
+  if (workdir === 2 && stage >= 2) return FILE_STATUS.staged
+  if (workdir === 0 && stage === 0 && headState === 1) return FILE_STATUS.deletedStaged
+  if (workdir === 0 && headState === 1) return FILE_STATUS.deleted
+  return FILE_STATUS.other
 }
 
 export function untrackedFiles(snapshot: Snapshot): string[] {
