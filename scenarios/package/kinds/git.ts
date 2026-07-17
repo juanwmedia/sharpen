@@ -377,6 +377,7 @@ export function assembleGitScenario(
   return {
     id: manifest.id,
     version: manifest.version,
+    kind: manifest.kind,
     pack: manifest.pack,
     title: manifest.title,
     difficulty: manifest.difficulty,

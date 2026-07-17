@@ -25,7 +25,11 @@ export const QUESTION_MAX_LENGTH = 500
 export const SWAP_SHORTCUT_CODES: readonly string[] = ['Backquote', 'IntlBackslash']
 export const SWAP_SHORTCUT_LABEL = 'Ctrl+`'
 
-export const LEADERBOARD_MAX_ROWS = 12
+/** Logo shown on scenario cards per artifact kind (assets in public/kinds/).
+ * A kind without an entry simply shows no logo. */
+export const KIND_LOGOS: Readonly<Record<string, string>> = {
+  git: '/kinds/git.svg',
+}
 
 /** Command output sent to the server transcript is capped at this size. */
 export const COMMAND_OUTPUT_MAX_CHARS = 2000

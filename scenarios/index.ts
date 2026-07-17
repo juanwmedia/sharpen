@@ -20,8 +20,9 @@ export function getScenarioByPackSlug(pack: string, slug: string): Scenario | un
 }
 
 export function scenarioSummaries(): ScenarioSummary[] {
-  return scenarios.map(({ id, pack, title, difficulty, timeLimitMs, briefing, tree, objective, themes }) => ({
+  return scenarios.map(({ id, kind, pack, title, difficulty, timeLimitMs, briefing, tree, objective, themes }) => ({
     id,
+    kind,
     pack,
     title,
     difficulty,

@@ -15,7 +15,6 @@ import type {
   Arena,
   Check,
   ScenarioSummary,
-  LeaderboardRow,
   MentorBubble,
   MentorErrorKind,
   RunMode,
@@ -70,7 +69,6 @@ const state = reactive<GameState>({
   player: '',
   engineVersion: '',
   scenarios: [],
-  leaderboard: [],
   mode: storedRunMode(),
   scenario: null,
   runId: null,
@@ -167,10 +165,6 @@ async function boot(): Promise<void> {
   state.player = meta.player
   state.engineVersion = meta.engineVersion
   state.scenarios = await getJson<ScenarioSummary[]>(apiRoutes.scenarios)
-}
-
-async function refreshLeaderboard(): Promise<void> {
-  state.leaderboard = await getJson<LeaderboardRow[]>(apiRoutes.leaderboard)
 }
 
 function learnPersistStatus(): LearnSnapshot['status'] | null {
@@ -598,7 +592,6 @@ function connectEvents(runId: string): void {
     const { kind, detail } = JSON.parse((e as MessageEvent).data) as { kind?: string; detail: string }
     pushMentorError(kind ?? '', detail)
   })
-  events.addEventListener(ARENA_EVENT.leaderboardUpdated, () => void refreshLeaderboard())
 }
 
 function runLost(): void {
@@ -618,7 +611,6 @@ export function useGame() {
     beginChallenge,
     leaveRun,
     askMentor,
-    refreshLeaderboard,
     setRunMode,
     revealSolution,
     wipeLearn,

@@ -29,16 +29,6 @@ export default {
     medium: 'medium',
     hard: 'hard',
   },
-  board: {
-    eyebrow: 'leaderboard',
-    title: 'Sharpest today',
-    empty: 'No runs yet. Be the first blade on the stone.',
-    rank: '#',
-    engineer: 'engineer',
-    score: 'score',
-    solved: 'solved',
-    best: 'best',
-  },
   arena: {
     back: 'Back to scenarios',
   },

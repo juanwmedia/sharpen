@@ -88,6 +88,9 @@ export interface Scenario {
   /** Immutable published version: bump on ANY change to a distributed
    * scenario. Evidence records it so rankings know what was actually played. */
   version: number
+  /** Artifact kind ('git', later 'ts', 'sql'...): declares which vocabulary
+   * interprets the document and which logo the UI shows for the scenario. */
+  kind: string
   pack: string
   title: string
   difficulty: 'easy' | 'medium' | 'hard'
@@ -112,7 +115,7 @@ export interface Scenario {
 
 export type ScenarioSummary = Pick<
   Scenario,
-  'id' | 'pack' | 'title' | 'difficulty' | 'timeLimitMs' | 'briefing' | 'tree' | 'objective' | 'themes'
+  'id' | 'kind' | 'pack' | 'title' | 'difficulty' | 'timeLimitMs' | 'briefing' | 'tree' | 'objective' | 'themes'
 >
 
 /** isomorphic-git PromiseFsClient produced by the fs bridge. */

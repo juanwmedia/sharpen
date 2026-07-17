@@ -53,7 +53,9 @@ Every scenario is the same ritual, and the ritual is the product:
 
 Two ways to play, one switch in the top bar:
 
-- **Challenge:** 60 seconds, a score, a local leaderboard. The adrenaline mode.
+- **Challenge:** 60 seconds against the clock, your speed is your score. The
+  adrenaline mode. (Attempts are recorded locally; the shared ranking arrives
+  in v2.)
 - **Learn:** no clock, no ranking. Progress persists between sessions and you
   decide when to reveal the solution. The mastery mode.
 

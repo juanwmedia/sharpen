@@ -28,16 +28,6 @@ export default {
     medium: 'media',
     hard: 'difícil',
   },
-  board: {
-    eyebrow: 'clasificación',
-    title: 'Los más afilados hoy',
-    empty: 'Aún no hay intentos. Sé la primera hoja en pasar por la piedra.',
-    rank: '#',
-    engineer: 'ingeniero',
-    score: 'puntos',
-    solved: 'resueltos',
-    best: 'mejor',
-  },
   arena: {
     back: 'Volver a los escenarios',
   },

@@ -44,7 +44,10 @@ skills/       The Claude Code plugin skill that boots the arena.
 - **Evidence.** Schema v1 in `engine/types.ts`; files in
   `~/.sharpen/evidence/`. Scoring: `max(10, 100 - seconds)`, fail/timeout 0.
   Do not change evidence shape or scoring casually: v2's shared ranking
-  replays and re-scores these files. Persisted keys are FROZEN across the
+  replays and re-scores these files. The leaderboard has NO UI since 2026-07
+  (v2 rebuilds ranking on FrontendLeap): the server still records
+  `~/.sharpen/leaderboard.json`, serves GET /api/leaderboard and emits
+  `leaderboard-updated`, but no client consumes them. Persisted keys are FROZEN across the
   Challenge -> Scenario rename: evidence, leaderboard entries and learn
   snapshots keep `challengeId` on disk. `scenarioVersion` is additive
   (2026-07): older files lack it, readers must tolerate that.

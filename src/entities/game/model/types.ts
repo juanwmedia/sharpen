@@ -1,4 +1,4 @@
-import type { Scenario, ScenarioSummary, Check, LeaderboardRow, RunMode } from '@engine/types.ts'
+import type { Scenario, ScenarioSummary, Check, RunMode } from '@engine/types.ts'
 
 /** Client-side run lifecycle. Distinct from the server's (it adds the
  * pre-network idle/countdown phases). */
@@ -35,7 +35,6 @@ export interface GameState {
   player: string
   engineVersion: string
   scenarios: ScenarioSummary[]
-  leaderboard: LeaderboardRow[]
   /** Preferred mode for the next run; persisted in localStorage. */
   mode: RunMode
   scenario: Scenario | null

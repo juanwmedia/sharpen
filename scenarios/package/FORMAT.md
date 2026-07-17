@@ -187,6 +187,8 @@ export const scenarios: Scenario[] = [cleanSweep, newScenario]
 2. Add `scenarios/package/kinds/<kind>.ts`: parser + interpreter for that
    kind's setup/check/solution vocabulary, with engine-rendered details.
 3. Branch in `assemble.ts`.
-4. Document the kind's vocabulary here. Do not bump `schema` unless the
+4. Drop the kind's logo in `public/kinds/<kind>.svg` and map it in
+   `KIND_LOGOS` (`src/shared/config`) so scenario cards show it.
+5. Document the kind's vocabulary here. Do not bump `schema` unless the
    **envelope** contract breaks (the vocabulary grows additively inside the
    kind).

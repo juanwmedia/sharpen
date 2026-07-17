@@ -146,6 +146,7 @@ describe('assembleScenario', () => {
   it('assembles Clean sweep with the same public shape as before, plus schema-2 fields', () => {
     expect(cleanSweep.id).toBe('git/clean-sweep')
     expect(cleanSweep.version).toBe(1)
+    expect(cleanSweep.kind).toBe('git')
     expect(cleanSweep.pack).toBe('git')
     expect(cleanSweep.title).toBe('Clean sweep')
     expect(cleanSweep.difficulty).toBe('medium')
