@@ -22,7 +22,7 @@ engine/       Deterministic git arena. Framework-agnostic: runs in the
   fs-bridge.ts just-bash IFileSystem -> isomorphic-git PromiseFsClient.
 server/       Express + SSE. Authoritative timer, transcript replay,
               evidence + leaderboard (~/.sharpen/), mentor process spawner.
-scenarios/    Registry + schema-1 packages (see package/FORMAT.md) + slug.ts.
+scenarios/    Registry + schema-2 document packages (package/FORMAT.md) + slug.ts.
 src/          Vue 3 SPA, Feature-Sliced Design (see below).
 test/         Vitest. Run with `npm test`.
 skills/       The Claude Code plugin skill that boots the arena.
@@ -44,7 +44,10 @@ skills/       The Claude Code plugin skill that boots the arena.
 - **Evidence.** Schema v1 in `engine/types.ts`; files in
   `~/.sharpen/evidence/`. Scoring: `max(10, 100 - seconds)`, fail/timeout 0.
   Do not change evidence shape or scoring casually: v2's shared ranking
-  replays and re-scores these files.
+  replays and re-scores these files. Persisted keys are FROZEN across the
+  Challenge -> Scenario rename: evidence, leaderboard entries and learn
+  snapshots keep `challengeId` on disk. `scenarioVersion` is additive
+  (2026-07): older files lack it, readers must tolerate that.
 - **Mentor.** One `Mentor` per run; each turn spawns
   `claude -p --model $SHARPEN_MENTOR_MODEL --tools ""` (default sonnet),
   prompt via stdin, `--session-id`/`--resume` for memory. NO turn budget, in
@@ -124,27 +127,35 @@ skills/       The Claude Code plugin skill that boots the arena.
 
 ## Adding a scenario
 
-Scenarios are **packages** (folder + schema 1). **Source of truth for authors
-and agents:** `scenarios/package/FORMAT.md` (layout, file roles, boilerplate,
-checklist). Canonical example: `scenarios/git/clean-sweep/`.
+Scenarios are **documents, not code** (folder + schema 2). **Source of truth
+for authors and agents:** `scenarios/package/FORMAT.md` (layout, envelope vs
+vocabulary, boilerplate, checklist). Canonical example:
+`scenarios/git/clean-sweep/`.
 
 1. Copy `scenarios/git/clean-sweep/` to `scenarios/<pack>/<name>/` and edit
-   `scenario.md`, `walkthrough.md`, `setup.ts`, `assert.ts` (keep `index.ts`
-   wiring via `assembleScenario`).
-2. `setup(env)`: build the repo with the env helpers (write/add/commit/
-   branch/checkout). It must be deterministic; the fixed clock and author
-   come from the arena.
-3. `assert(ctx)`: pure state checks over `ctx.snapshot` (plus `ctx.fs` for
-   file contents). Each check carries bilingual `name` and `detail`. Never
-   inspect the typed transcript.
-4. Copy lives in `scenario.md` (bilingual Briefing/Objective sections) and
-   `spec.tree` for git; `walkthrough.md` is English only (mentor reveal);
-   `themes` are soft UI concept chips (not solving commands).
+   `scenario.md`, `scenario.yaml`, `walkthrough.md` (keep `index.ts`).
+2. `scenario.yaml` declares setup as steps (ops mirror ScenarioSetupEnv:
+   write/remove/add/commit/branch/checkout), checks as predicates
+   (untracked/staged/head/file) and `solution.commands` (canonical solving
+   commands, never shown to the player). The engine interprets the document:
+   deterministic by construction, and the interpreter IS the validator
+   (unknown vocabulary fails to load naming what is missing).
+3. Checks carry only a bilingual `name`; the pass/fail detail is rendered by
+   the engine per predicate, in every language, consistently. State-based
+   only: predicates see the snapshot, never the transcript.
+4. Copy lives in `scenario.md` (bilingual Briefing/Objective sections,
+   `version` integer, `spec.tree` for git); `walkthrough.md` is English only
+   (mentor reveal); `themes` are soft UI concept chips (not solving commands).
+   Published `version` is immutable: bump it on ANY change; evidence records
+   `scenarioVersion`.
 5. Register it in `scenarios/index.ts`. The URL becomes
-   `/<pack>/<slugify(title)>`; `test/slug.test.ts` guards collisions.
+   `/<pack>/<slugify(title)>`; `test/slug.test.ts` guards collisions and
+   `test/scenario-dryrun.test.ts` proves solvability (fresh arena must not
+   pass; the solution must turn every check green).
 6. If it needs a git subcommand the porcelain lacks, extend
    `engine/porcelain/git-command.ts` with faithful output and add cases to
-   `test/porcelain.test.ts`.
+   `test/porcelain.test.ts`. If it needs a new setup op or predicate, extend
+   `scenarios/package/kinds/git.ts` (parser + interpreter + details).
 
 ## Workflow
 

@@ -85,6 +85,9 @@ export interface ScenarioAssertContext {
 
 export interface Scenario {
   id: string
+  /** Immutable published version: bump on ANY change to a distributed
+   * scenario. Evidence records it so rankings know what was actually played. */
+  version: number
   pack: string
   title: string
   difficulty: 'easy' | 'medium' | 'hard'
@@ -100,6 +103,9 @@ export interface Scenario {
   /** Canonical solution, revealed by the mentor after timeout (challenge) or
    * voluntary reveal (learn). English only: it feeds the mentor. */
   walkthrough: string
+  /** Canonical solving commands: machine proof of solvability (the dry-run
+   * validator replays them). Never shown to the player. */
+  solution: string[]
   setup(env: ScenarioSetupEnv): Promise<void>
   assert(ctx: ScenarioAssertContext): Promise<{ pass: boolean; checks: Check[] }>
 }
@@ -135,6 +141,9 @@ export interface Evidence {
   /** Persisted schema-1 key: stays `challengeId` on disk (the entity renamed
    * to Scenario in code, but evidence files predate that and v2 replays them). */
   challengeId: string
+  /** Version of the scenario that was played (additive since 2026-07: older
+   * evidence files lack it, readers must tolerate its absence). */
+  scenarioVersion?: number
   player: string
   startedAt: number
   submittedAt: number

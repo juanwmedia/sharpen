@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "start": "tsx --import ./challenges/package/register-md.ts server/index.ts",
+    "start": "tsx --import ./scenarios/package/register-md.ts server/index.ts",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit"
   },

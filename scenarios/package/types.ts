@@ -3,8 +3,10 @@ import type { Locale } from '../../engine/types.ts'
 /** Discriminator for which assembler understands setup/assert/spec. */
 export type ScenarioKind = 'git'
 
-export interface ScenarioManifestV1 {
-  schema: 1
+export interface ScenarioManifest {
+  schema: 2
+  /** Immutable per-scenario version: bump on ANY published change. */
+  version: number
   id: string
   kind: ScenarioKind
   pack: string
@@ -21,7 +23,7 @@ export interface GitScenarioSpec {
 }
 
 export interface ParsedScenarioMd {
-  manifest: ScenarioManifestV1
+  manifest: ScenarioManifest
   briefing: Record<Locale, string>
   objective: Record<Locale, string>
 }

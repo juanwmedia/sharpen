@@ -1,0 +1,91 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/api/client.ts
+      content: |
+        export async function fetchNotes(patientId: string) {
+          const response = await fetch(`/api/notes/${patientId}`)
+          return response.json()
+        }
+  - write:
+      path: src/index.ts
+      content: |
+        export { fetchNotes } from './api/client'
+  - write:
+      path: README.md
+      content: |
+        # noa-notes
+
+        Patient notes client.
+  - add: [src/api/client.ts, src/index.ts, README.md]
+  - commit: 'feat: initial notes client'
+
+  - write:
+      path: src/api/retry.ts
+      content: |
+        export const MAX_RETRIES = 3
+  - add: [src/api/retry.ts]
+  - commit: 'feat: add retry policy'
+
+  # The mess: one real change to keep, junk to sweep.
+  - write:
+      path: src/api/client.ts
+      content: &dirty-client |
+        export async function fetchNotes(patientId: string) {
+          const response = await fetch(`/api/notes/${patientId}`)
+          if (!response.ok) throw new Error('notes fetch failed')
+          return response.json()
+        }
+  - write:
+      path: tmp/debug.log
+      content: |
+        GET /api/notes/42 200 12ms
+  - write:
+      path: tmp/cache.json
+      content: |
+        {"stale":true}
+  - write:
+      path: notes/ideas.md
+      content: |
+        - try exponential backoff
+  - write:
+      path: build.log
+      content: |
+        webpack compiled with 1 warning
+
+checks:
+  - name:
+      en: No untracked files remain
+      es: No queda ningún archivo sin seguimiento
+    expect:
+      untracked: none
+
+  - name:
+      en: Work in progress survived, unstaged
+      es: El trabajo en curso sobrevivió, fuera del stage
+    expect:
+      file:
+        path: src/api/client.ts
+        status: modified
+        contentEquals: *dirty-client
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+  - name:
+      en: History untouched on main
+      es: Historial intacto en main
+    expect:
+      head:
+        branch: main
+        commits: 2
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git clean -fd

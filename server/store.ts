@@ -56,6 +56,7 @@ export async function saveEvidence(run: Run, verdict: Verdict): Promise<Evidence
     engineVersion: ENGINE_VERSION,
     runId: run.id,
     challengeId: run.scenarioId,
+    scenarioVersion: run.scenario.version,
     player: run.player,
     // Evidence is only written for runs that have started, so startedAt is set.
     startedAt: run.startedAt!,

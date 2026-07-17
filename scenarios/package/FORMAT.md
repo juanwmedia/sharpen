@@ -1,8 +1,9 @@
-# Scenario package format (schema 1)
+# Scenario package format (schema 2)
 
-A scenario is a **folder you can zip and share**. The loader turns it into the
-runtime `Scenario` object the arena already understands. UI copy (briefing,
-objective, tree) is never hardcoded in the product: it is read from the package.
+A scenario is a **document, not code**: a folder of markdown prose plus one
+declarative mechanics file. Nothing in a package executes; the engine
+interprets it. That is what makes scenarios safe to distribute, automatic to
+validate, and replayable in CI.
 
 Canonical example: [`scenarios/git/clean-sweep/`](../git/clean-sweep/).
 Copy that folder when adding a git scenario.
@@ -11,11 +12,10 @@ Copy that folder when adding a git scenario.
 
 ```text
 scenarios/<pack>/<name>/
-  scenario.md       # YAML frontmatter + localized sections
+  scenario.md       # YAML frontmatter (identity) + localized prose sections
+  scenario.yaml     # mechanics: setup steps, check predicates, solution
   walkthrough.md    # English mentor reveal (body only)
-  setup.ts          # deterministic initial state
-  assert.ts         # state-based checks
-  index.ts          # assembleScenario(...) + default export
+  index.ts          # assembleScenario(...) + default export (boilerplate)
 ```
 
 Register the package explicitly in [`scenarios/index.ts`](../index.ts)
@@ -25,34 +25,31 @@ Register the package explicitly in [`scenarios/index.ts`](../index.ts)
 
 | File | Role | Who reads it |
 |------|------|----------------|
-| `scenario.md` | Identity, themes, kind `spec`, player-facing briefing/objective | UI, picker summary, mentor `Goal:` (objective.en) |
-| `walkthrough.md` | Canonical solution (English) | Mentor only, on reveal / timeout |
-| `setup.ts` | Build the initial arena state | Browser arena + server replay |
-| `assert.ts` | Rubric over final state | Every Enter / submit (local + authoritative) |
-| `index.ts` | Wire md + hooks through `assembleScenario` | Registry import |
+| `scenario.md` | Identity, version, themes, kind `spec`, briefing/objective | UI, picker summary, mentor `Goal:` (objective.en) |
+| `scenario.yaml` | Setup steps, check predicates, canonical solution | Engine interpreter (browser arena + server replay + dry-run) |
+| `walkthrough.md` | Canonical solution prose (English) | Mentor only, on reveal / timeout |
+| `index.ts` | Wire the three sources through `assembleScenario` | Registry import |
 
-## Core vs kind vs pack
+## The two-layer contract
 
-| Field | Role |
-|-------|------|
-| **Core** (`schema`, `id`, `kind`, `pack`, `title`, `difficulty`) | Required. Stable across domains. |
-| **Optional core** (`timeLimitMs`, `themes`) | Defaults: 60000 ms, `[]`. |
-| **`spec`** | Open map for kind-specific data. Git requires `spec.tree`. Unknown keys are ignored by other kinds. |
-| **`kind`** | Which assembler understands hooks + `spec` (`git` today). |
-| **`pack`** | Catalog / URL grouping (`/:pack/:slug`). May differ from `kind` later. |
+The **envelope** is engine-agnostic and stable: `schema`, `id`, `kind`,
+`version`, prose sections, "setup is a list of tagged steps", "checks are
+name + expect", "solution proves solvability". The **vocabulary** (which
+steps, which predicates, what the solution looks like) belongs to each
+`kind` and grows additively.
 
-Conventions:
-
-- `id` is usually `<pack>/<folder-name>` (e.g. `git/clean-sweep`).
-- Public URL is `/<pack>/<slugify(title)>` (title slug, not folder name).
-- Adding SQL later = new `kind` assembler + new `spec` keys. Existing git
-  packages need **no** changes. Do not put domain fields on the root manifest.
+**The interpreter is the validator.** A document using an op or predicate
+this engine does not know fails to load with an error naming exactly what is
+missing (e.g. `unknown op "stash"; this engine supports: write, remove, add,
+commit, branch, checkout`). That message is the capability boundary: no
+`requires.engine` bookkeeping, the document IS its own requirements.
 
 ## scenario.md
 
 ```yaml
 ---
-schema: 1
+schema: 2
+version: 1
 id: git/clean-sweep
 kind: git
 pack: git
@@ -79,68 +76,74 @@ spec:
 ...
 ```
 
-Section headings must be exactly `## Briefing (locale)` / `## Objective (locale)`
-for every locale in `LOCALES` (`en`, `es`). Missing or empty sections fail load.
+- `version` is a positive integer and published versions are **immutable**:
+  any change to a distributed scenario bumps it. Evidence records
+  `scenarioVersion`, so rankings know exactly what was played.
+- Section headings must be exactly `## Briefing (locale)` /
+  `## Objective (locale)` for every locale in `LOCALES` (`en`, `es`).
+- For `kind: git`, `spec.tree` is the English ASCII snapshot shown in the UI.
+  Keep it aligned with what `setup` actually creates. No em or en dashes.
 
-For `kind: git`, `spec.tree` is the English ASCII snapshot shown in the UI.
-Keep it aligned with what `setup.ts` actually creates (paths + light notes like
-`(modified - keep)`). No em dashes or en dashes anywhere (use ASCII `-`).
+## scenario.yaml (kind: git vocabulary)
+
+```yaml
+setup:
+  - write: { path: a.txt, content: "hello\n" }   # or block scalars for code
+  - add: [a.txt]
+  - commit: 'feat: initial'
+  - branch: feature            # or { name: feature, checkout: true }
+  - checkout: main
+  - remove: a.txt
+
+checks:
+  - name: { en: No untracked files remain, es: No queda nada sin seguimiento }
+    expect: { untracked: none }
+  - name: { en: Nothing staged, es: Nada en el stage }
+    expect: { staged: none }
+  - name: { en: History intact, es: Historial intacto }
+    expect: { head: { branch: main, commits: 2 } }
+  - name: { en: Edit survived, es: El cambio sobrevivió }
+    expect:
+      file: { path: a.txt, status: modified, contentEquals: "hello\n" }
+
+solution:
+  commands:
+    - git clean -fd
+```
+
+- **Setup ops** mirror `ScenarioSetupEnv` one to one: `write`, `remove`,
+  `add`, `commit`, `branch`, `checkout`. Deterministic by construction: a
+  document cannot call `Date.now()`.
+- **Check predicates**: `untracked: none`, `staged: none`,
+  `head: { branch?, commits? }`, `file: { path, status?, contentEquals? }`.
+  Authors write only the bilingual `name`; the pass/fail **detail is rendered
+  by the engine** (both languages, consistent everywhere). Extending either
+  vocabulary means implementing it in `kinds/git.ts` first.
+- **YAML anchors** share content between setup and checks (write with
+  `content: &name |` and assert with `contentEquals: *name`).
+- **`solution.commands`** is the machine proof of solvability. The dry-run
+  test (`test/scenario-dryrun.test.ts`) replays every registered scenario:
+  fresh arena must NOT pass, then the solution runs, then every check must
+  pass. A scenario that cannot prove itself does not ship. It is never shown
+  to the player.
 
 ## walkthrough.md
 
 Plain English body (no frontmatter). Spoiler for the mentor after reveal.
 Describe the canonical approach and note that any state-correct solution passes.
 
-## setup.ts / assert.ts (git)
-
-```ts
-// setup.ts
-import type { ScenarioSetupEnv } from '../../../engine/types.ts'
-
-export async function setup(env: ScenarioSetupEnv): Promise<void> {
-  await env.write('README.md', '# demo\n')
-  await env.add('README.md')
-  await env.commit('init')
-  // ... more writes / add / commit / branch / checkout
-}
-```
-
-`ScenarioSetupEnv` helpers: `write`, `remove`, `add`, `commit`, `branch`,
-`checkout`, plus `fs` / `git` / `dir` if needed. Deterministic only: no
-`Date.now()`, no randomness (arena supplies fixed clock and author).
-
-```ts
-// assert.ts
-import { statusOf, untrackedFiles } from '../../../engine/snapshot.ts'
-import type { ScenarioAssertContext, Check } from '../../../engine/types.ts'
-
-export async function assert(
-  ctx: ScenarioAssertContext
-): Promise<{ pass: boolean; checks: Check[] }> {
-  const checks: Check[] = []
-  // Inspect ctx.snapshot (and ctx.fs for file bytes). Never the transcript.
-  // Each check: bilingual name + detail ({ en, es }), and pass: boolean.
-  return { pass: checks.every((c) => c.pass), checks }
-}
-```
-
-Useful snapshot helpers live in `engine/snapshot.ts` (`statusOf`,
-`untrackedFiles`, …).
-
 ## index.ts (boilerplate)
 
 ```ts
 import { assembleScenario } from '../../package/assemble.ts'
-import { assert } from './assert.ts'
 import scenarioSrc from './scenario.md'
-import { setup } from './setup.ts'
+import mechanicsSrc from './scenario.yaml'
 import walkthroughSrc from './walkthrough.md'
 
 export default assembleScenario({
   scenarioSrc,
   walkthroughSrc,
-  setup,
-  assert,
+  mechanicsSrc,
 })
 ```
 
@@ -157,26 +160,33 @@ export const scenarios: Scenario[] = [cleanSweep, newScenario]
 
 - Briefing and objective never name the solving command.
 - Themes are concept chips (English git vocabulary), not commands.
-- `setup` deterministic; `assert` state-based only.
-- Check `name` / `detail` bilingual; titles and `spec.tree` English.
-- `walkthrough.md` English only.
+- Checks are state-based only: they see the snapshot, never the transcript.
+- Check `name` bilingual; titles and `spec.tree` English; `walkthrough.md`
+  English only.
+- Published `version` is immutable: bump it on any change.
 - If the scenario needs a git subcommand the porcelain lacks, extend
   `engine/porcelain/git-command.ts` and add cases in `test/porcelain.test.ts`.
-- Gate: `npm test`, `npm run typecheck`, `npm run build`, no em/en dashes in
-  touched files.
+  If it needs a new setup op or predicate, extend `kinds/git.ts` (parser +
+  interpreter + rendered details) and cover it in
+  `test/scenario-package.test.ts`.
+- Gate: `npm test` (includes the dry-run), `npm run typecheck`,
+  `npm run build`, no em/en dashes in touched files.
 
 ## Adding a scenario (checklist)
 
 1. Copy `scenarios/git/clean-sweep/` to `scenarios/<pack>/<name>/`.
-2. Edit `scenario.md`, `walkthrough.md`, `setup.ts`, `assert.ts` (keep `index.ts`
-   shape unless imports change).
+2. Edit `scenario.md`, `scenario.yaml`, `walkthrough.md` (keep `index.ts`).
 3. Import and append in `scenarios/index.ts`.
-4. Run the gate. `test/slug.test.ts` fails on title/slug collisions.
+4. Run the gate. `test/slug.test.ts` fails on title/slug collisions and
+   `test/scenario-dryrun.test.ts` fails if the solution does not prove the
+   scenario solvable.
 
 ## Adding a future kind
 
 1. Extend `ScenarioKind` in `scenarios/package/types.ts`.
-2. Add `scenarios/package/kinds/<kind>.ts` assembler.
+2. Add `scenarios/package/kinds/<kind>.ts`: parser + interpreter for that
+   kind's setup/check/solution vocabulary, with engine-rendered details.
 3. Branch in `assemble.ts`.
-4. Document kind-specific `spec` keys here. Do not bump `schema` unless the
-   **core** contract breaks.
+4. Document the kind's vocabulary here. Do not bump `schema` unless the
+   **envelope** contract breaks (the vocabulary grows additively inside the
+   kind).

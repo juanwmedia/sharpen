@@ -1,6 +1,6 @@
 import { parse as parseYaml } from 'yaml'
 import { LOCALES, type Locale } from '../../engine/types.ts'
-import type { ParsedScenarioMd, ScenarioKind, ScenarioManifestV1 } from './types.ts'
+import type { ParsedScenarioMd, ScenarioKind, ScenarioManifest } from './types.ts'
 
 const SECTION_RE = /^##\s+([A-Za-z][A-Za-z0-9 ]*?)\s*\((\w+)\)\s*$/gm
 
@@ -16,14 +16,17 @@ function requireNonEmpty(label: string, value: string): string {
   return trimmed
 }
 
-function parseManifest(raw: unknown): ScenarioManifestV1 {
+function parseManifest(raw: unknown): ScenarioManifest {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('scenario.md: frontmatter must be a YAML object')
   }
   const data = raw as Record<string, unknown>
 
-  if (data.schema !== 1) {
-    throw new Error(`scenario.md: unsupported schema ${String(data.schema)} (expected 1)`)
+  if (data.schema !== 2) {
+    throw new Error(`scenario.md: unsupported schema ${String(data.schema)} (expected 2)`)
+  }
+  if (typeof data.version !== 'number' || !Number.isInteger(data.version) || data.version < 1) {
+    throw new Error('scenario.md: version must be a positive integer (bump it on any published change)')
   }
   for (const key of ['id', 'kind', 'pack', 'title', 'difficulty'] as const) {
     if (typeof data[key] !== 'string' || !(data[key] as string).trim()) {
@@ -66,7 +69,8 @@ function parseManifest(raw: unknown): ScenarioManifestV1 {
   }
 
   return {
-    schema: 1,
+    schema: 2,
+    version: data.version,
     id: (data.id as string).trim(),
     kind: kind as ScenarioKind,
     pack: (data.pack as string).trim(),
@@ -109,7 +113,7 @@ function parseSections(body: string): {
   return { briefing, objective }
 }
 
-/** Parse schema-1 scenario.md (YAML frontmatter + localized sections). */
+/** Parse schema-2 scenario.md (YAML frontmatter + localized sections). */
 export function parseScenarioMd(source: string): ParsedScenarioMd {
   const trimmed = source.replace(/^\uFEFF/, '').trimStart()
   if (!trimmed.startsWith('---')) {

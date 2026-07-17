@@ -1,5 +1,6 @@
 ---
-schema: 1
+schema: 2
+version: 1
 id: git/clean-sweep
 kind: git
 pack: git

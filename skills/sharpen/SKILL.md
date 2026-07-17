@@ -58,6 +58,6 @@ grade, or watch the game from this session.
 
 This skill does **not** author challenges (see Rules: never edit the plugin
 tree). If the user asks how scenarios are packaged, point them at
-`${CLAUDE_PLUGIN_ROOT}/challenges/package/FORMAT.md` and the example
-`${CLAUDE_PLUGIN_ROOT}/challenges/git/clean-sweep/`. Agents working in the
+`${CLAUDE_PLUGIN_ROOT}/scenarios/package/FORMAT.md` and the example
+`${CLAUDE_PLUGIN_ROOT}/scenarios/git/clean-sweep/`. Agents working in the
 repo should follow `FORMAT.md` + `CLAUDE.md`, not this launch skill.

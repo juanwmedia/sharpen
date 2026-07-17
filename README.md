@@ -120,8 +120,10 @@ npm run typecheck  # vue-tsc --noEmit
 ```
 
 To add a scenario: create a package folder `scenarios/<pack>/<name>/` with
-`scenario.md` (schema 1 frontmatter + bilingual sections), `walkthrough.md`,
-`setup.ts`, and `assert.ts`, then register it in `scenarios/index.ts`. See
+`scenario.md` (schema 2 frontmatter + bilingual sections), `scenario.yaml`
+(declarative setup steps, check predicates and the canonical solution) and
+`walkthrough.md`, then register it in `scenarios/index.ts`. Scenarios are
+documents, not code: the engine interprets and validates them. See
 `scenarios/package/FORMAT.md`. Its URL becomes `/<pack>/<slug-of-title>`.
 
 Architecture, contracts and conventions live in `CLAUDE.md`. Verified
