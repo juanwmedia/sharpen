@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { createArena } from '../engine/arena.ts'
-import challenge from '../challenges/git/clean-sweep/index.ts'
+import scenario from '../scenarios/git/clean-sweep/index.ts'
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
 
 async function freshArena() {
-  return createArena(challenge)
+  return createArena(scenario)
 }
 
 describe('git porcelain', () => {
-  it('reports the challenge mess in status --short', async () => {
+  it('reports the scenario mess in status --short', async () => {
     const arena = await freshArena()
     const r = await arena.exec('git status --short')
     const out = strip(r.stdout)
@@ -99,7 +99,7 @@ describe('git porcelain', () => {
   })
 })
 
-describe('clean-sweep challenge verdict', () => {
+describe('clean-sweep scenario verdict', () => {
   it('fails before any action', async () => {
     const arena = await freshArena()
     const verdict = await arena.verdict()

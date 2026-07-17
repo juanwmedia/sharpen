@@ -1,10 +1,10 @@
-import type { Challenge, ChallengeSummary, Check, LeaderboardRow, RunMode } from '@engine/types.ts'
+import type { Scenario, ScenarioSummary, Check, LeaderboardRow, RunMode } from '@engine/types.ts'
 
 /** Client-side run lifecycle. Distinct from the server's (it adds the
  * pre-network idle/countdown phases). */
 export const RUN_STATUS = {
   idle: 'idle',
-  /** Challenge mode: scenario loaded, waiting for Start (no server run yet). */
+  /** Scenario mode: scenario loaded, waiting for Start (no server run yet). */
   briefing: 'briefing',
   countdown: 'countdown',
   live: 'live',
@@ -34,11 +34,11 @@ export interface MentorItem {
 export interface GameState {
   player: string
   engineVersion: string
-  challenges: ChallengeSummary[]
+  scenarios: ScenarioSummary[]
   leaderboard: LeaderboardRow[]
   /** Preferred mode for the next run; persisted in localStorage. */
   mode: RunMode
-  challenge: Challenge | null
+  scenario: Scenario | null
   runId: string | null
   status: RunStatus
   deadline: number

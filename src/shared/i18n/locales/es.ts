@@ -1,5 +1,5 @@
 // Spanish UI copy. Mirrors en.ts key for key (guarded by test/i18n.test.ts).
-// Challenge content stays in English on purpose: git speaks English.
+// Scenario content stays in English on purpose: git speaks English.
 export default {
   app: {
     engine: 'engine {version}',

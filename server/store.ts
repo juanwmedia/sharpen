@@ -15,6 +15,7 @@ const evidenceDir = join(dataDir, 'evidence')
 
 interface LeaderboardEntry {
   player: string
+  /** Persisted schema-1 key: stays `challengeId` on disk (see Evidence). */
   challengeId: string
   pass: boolean
   durationMs: number
@@ -54,7 +55,7 @@ export async function saveEvidence(run: Run, verdict: Verdict): Promise<Evidence
     schema: 1,
     engineVersion: ENGINE_VERSION,
     runId: run.id,
-    challengeId: run.challengeId,
+    challengeId: run.scenarioId,
     player: run.player,
     // Evidence is only written for runs that have started, so startedAt is set.
     startedAt: run.startedAt!,

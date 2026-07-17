@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { getChallengeBySlug } from '@challenges/index.ts'
-import { slugify } from '@challenges/slug.ts'
+import { getScenarioBySlug } from '@scenarios/index.ts'
+import { slugify } from '@scenarios/slug.ts'
 import { ROUTE_NAMES } from '@/shared/config/index.ts'
 import { ArenaPage } from '@/pages/arena/index.ts'
 import { PickerPage } from '@/pages/picker/index.ts'
@@ -11,8 +11,8 @@ function scenarioPath(pack: string, title: string): string {
 
 function redirectLegacySlug(to: { params: { slug?: string | string[] } }): string {
   const slug = String(to.params.slug ?? '')
-  const challenge = getChallengeBySlug(slug)
-  return challenge ? scenarioPath(challenge.pack, challenge.title) : '/'
+  const scenario = getScenarioBySlug(slug)
+  return scenario ? scenarioPath(scenario.pack, scenario.title) : '/'
 }
 
 // Public URLs are /:pack/:slug (e.g. /git/clean-sweep). Pack is the category

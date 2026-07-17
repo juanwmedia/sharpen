@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import type { Response } from 'express'
 import { createArena } from '../engine/arena.ts'
-import { getChallenge } from '../challenges/index.ts'
+import { getScenario } from '../scenarios/index.ts'
 import type { Snapshot } from '../engine/types.ts'
 import {
   ARENA_EVENT,
   DEFAULT_LOCALE,
   DEFAULT_RUN_MODE,
   type ArenaEventName,
-  type Challenge,
+  type Scenario,
   type Locale,
   type RunMode,
   type Verdict,
@@ -37,12 +37,12 @@ export interface TranscriptEntry {
 
 export interface Run {
   id: string
-  challengeId: string
-  challenge: Challenge
+  scenarioId: string
+  scenario: Scenario
   player: string
   /** UI language of the player; the mentor answers in it. */
   locale: Locale
-  /** Learn: no timer, no local ranking. Challenge: timed + evidence. */
+  /** Learn: no timer, no local ranking. Scenario: timed + evidence. */
   mode: RunMode
   status: RunStatus
   transcript: TranscriptEntry[]
@@ -63,7 +63,7 @@ export interface Run {
   lastCommandErrored: boolean
 }
 
-// In-memory run registry. One run = one attempt at one challenge by the local
+// In-memory run registry. One run = one attempt at one scenario by the local
 // player. The browser executes commands locally for instant feedback; the
 // server replays the transcript with the SAME engine to produce the
 // authoritative verdict and the evidence: the exact code path CI will run
@@ -72,22 +72,22 @@ export class RunStore {
   runs = new Map<string, Run>()
 
   create({
-    challengeId,
+    scenarioId,
     player,
     locale,
     mode,
   }: {
-    challengeId: string
+    scenarioId: string
     player: string
     locale?: Locale
     mode?: RunMode
   }): Run | null {
-    const challenge = getChallenge(challengeId)
-    if (!challenge) return null
+    const scenario = getScenario(scenarioId)
+    if (!scenario) return null
     const run: Run = {
       id: randomUUID().slice(0, RUN_ID_CHARS),
-      challengeId,
-      challenge,
+      scenarioId,
+      scenario,
       player,
       locale: locale ?? DEFAULT_LOCALE,
       mode: mode ?? DEFAULT_RUN_MODE,
@@ -139,13 +139,13 @@ export class RunStore {
     run.status = RUN_STATUS.live
     run.startedAt = Date.now()
     if (run.mode === 'challenge') {
-      run.deadline = run.startedAt + run.challenge.timeLimitMs
+      run.deadline = run.startedAt + run.scenario.timeLimitMs
       run.timer = setTimeout(() => {
         if (run.status === RUN_STATUS.live) {
           run.status = RUN_STATUS.revealed
           onTimeout(run)
         }
-      }, run.challenge.timeLimitMs)
+      }, run.scenario.timeLimitMs)
     }
     this.emit(run, ARENA_EVENT.started, { startedAt: run.startedAt, deadline: run.deadline })
     if (run.restoredStatus === 'passed' || run.restoredStatus === 'revealed') {
@@ -195,7 +195,7 @@ export class RunStore {
 
   /** Replay transcript into a fresh arena. No attempt counter / status side effects. */
   async replay(run: Run): Promise<{ snapshot: Snapshot; verdict: Verdict }> {
-    const arena = await createArena(run.challenge)
+    const arena = await createArena(run.scenario)
     for (const { command } of run.transcript) {
       await arena.exec(command)
     }

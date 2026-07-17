@@ -1,4 +1,4 @@
-// English UI copy. Default language. Challenge content (titles, briefings,
+// English UI copy. Default language. Scenario content (titles, briefings,
 // objectives, check names) is authored in English and is intentionally NOT
 // translated: it is content, not chrome, and git itself speaks English.
 export default {
@@ -104,7 +104,7 @@ export default {
   },
   wipeModal: {
     title: 'Wipe learn progress?',
-    body: 'This clears your saved commands and mentor conversation for this scenario. Challenge mode is unaffected.',
+    body: 'This clears your saved commands and mentor conversation for this scenario. Scenario mode is unaffected.',
     confirm: 'Wipe and restart',
     cancel: 'Keep progress',
   },

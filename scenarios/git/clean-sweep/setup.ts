@@ -1,4 +1,4 @@
-import type { ChallengeSetupEnv } from '../../../engine/types.ts'
+import type { ScenarioSetupEnv } from '../../../engine/types.ts'
 
 export const DIRTY_CLIENT = `export async function fetchNotes(patientId: string) {
   const response = await fetch(\`/api/notes/\${patientId}\`)
@@ -7,7 +7,7 @@ export const DIRTY_CLIENT = `export async function fetchNotes(patientId: string)
 }
 `
 
-export async function setup(env: ChallengeSetupEnv): Promise<void> {
+export async function setup(env: ScenarioSetupEnv): Promise<void> {
   await env.write(
     'src/api/client.ts',
     `export async function fetchNotes(patientId: string) {

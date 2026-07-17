@@ -1,12 +1,12 @@
 import { FILE_STATUS, statusOf, untrackedFiles } from '../../../engine/snapshot.ts'
-import type { ChallengeAssertContext, Check } from '../../../engine/types.ts'
+import type { ScenarioAssertContext, Check } from '../../../engine/types.ts'
 import { DIRTY_CLIENT } from './setup.ts'
 
 export async function assert({
   snapshot,
   fs,
   dir,
-}: ChallengeAssertContext): Promise<{ pass: boolean; checks: Check[] }> {
+}: ScenarioAssertContext): Promise<{ pass: boolean; checks: Check[] }> {
   const checks: Check[] = []
 
   const untracked = untrackedFiles(snapshot)

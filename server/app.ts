@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import express from 'express'
-import { challengeSummaries, getChallenge } from '../challenges/index.ts'
+import { scenarioSummaries, getScenario } from '../scenarios/index.ts'
 import { formatBoard } from '../engine/board.ts'
 import {
   ARENA_EVENT,
@@ -146,7 +146,7 @@ function mentorPromptFor(
     phase: open ? MENTOR_PHASE.open : MENTOR_PHASE.closed,
     howClosed,
     trigger,
-    challenge: run.challenge,
+    scenario: run.scenario,
     board: formatBoard(snapshot),
     transcript: run.transcript,
     checks,
@@ -182,36 +182,37 @@ app.get('/api/meta', async (_req, res) => {
   res.json({ engineVersion: ENGINE_VERSION, player: await defaultPlayer() })
 })
 
-app.get('/api/challenges', (_req, res) => {
-  res.json(challengeSummaries())
+app.get('/api/scenarios', (_req, res) => {
+  res.json(scenarioSummaries())
 })
 
 app.get('/api/leaderboard', async (_req, res) => {
   res.json(await leaderboard())
 })
 
-app.get('/api/learn/:challengeId', async (req, res) => {
-  const challengeId = decodeURIComponent(req.params.challengeId)
-  if (!getChallenge(challengeId)) return res.status(404).json({ error: 'unknown challenge' })
+app.get('/api/learn/:scenarioId', async (req, res) => {
+  const scenarioId = decodeURIComponent(req.params.scenarioId)
+  if (!getScenario(scenarioId)) return res.status(404).json({ error: 'unknown scenario' })
   // 200 + null when empty: a 404 is correct REST but the browser paints every
   // failed fetch red in the console on every Learn enter.
-  const snapshot = await loadLearn(challengeId)
+  const snapshot = await loadLearn(scenarioId)
   res.json(snapshot)
 })
 
-app.put('/api/learn/:challengeId', async (req, res) => {
-  const challengeId = decodeURIComponent(req.params.challengeId)
-  if (!getChallenge(challengeId)) return res.status(404).json({ error: 'unknown challenge' })
-  const snapshot = parseLearnSnapshot({ ...req.body, challengeId }, challengeId)
+app.put('/api/learn/:scenarioId', async (req, res) => {
+  const scenarioId = decodeURIComponent(req.params.scenarioId)
+  if (!getScenario(scenarioId)) return res.status(404).json({ error: 'unknown scenario' })
+  // The URL owns the id; the body key keeps the persisted name (see LearnSnapshot).
+  const snapshot = parseLearnSnapshot({ ...req.body, challengeId: scenarioId }, scenarioId)
   if (!snapshot) return res.status(400).json({ error: 'invalid snapshot' })
   await saveLearn(snapshot)
   res.status(204).end()
 })
 
-app.delete('/api/learn/:challengeId', async (req, res) => {
-  const challengeId = decodeURIComponent(req.params.challengeId)
-  if (!getChallenge(challengeId)) return res.status(404).json({ error: 'unknown challenge' })
-  await deleteLearn(challengeId)
+app.delete('/api/learn/:scenarioId', async (req, res) => {
+  const scenarioId = decodeURIComponent(req.params.scenarioId)
+  if (!getScenario(scenarioId)) return res.status(404).json({ error: 'unknown scenario' })
+  await deleteLearn(scenarioId)
   res.status(204).end()
 })
 
@@ -219,8 +220,8 @@ app.post('/api/runs', async (req, res) => {
   const player = (req.body?.player ?? (await defaultPlayer())).slice(0, PLAYER_NAME_MAX_CHARS)
   const locale = LOCALES.find((l) => l === req.body?.locale) ?? DEFAULT_LOCALE
   const mode = RUN_MODES.find((m) => m === req.body?.mode) ?? DEFAULT_RUN_MODE
-  const run = runs.create({ challengeId: req.body?.challengeId, player, locale, mode })
-  if (!run) return res.status(404).json({ error: 'unknown challenge' })
+  const run = runs.create({ scenarioId: req.body?.scenarioId, player, locale, mode })
+  if (!run) return res.status(404).json({ error: 'unknown scenario' })
   res.json({ runId: run.id, player, mode: run.mode })
 })
 
@@ -256,7 +257,7 @@ app.post('/api/runs/:id/start', async (req, res) => {
     const { verdict } = await runs.inspect(run)
     run.nudgeBaseline = baselineOf(verdict)
   }
-  slog(`run=${run.id} started player=${run.player} challenge=${run.challengeId} mode=${run.mode}`)
+  slog(`run=${run.id} started player=${run.player} scenario= mode=${run.mode}`)
   res.json({ startedAt: run.startedAt, deadline: run.deadline, mode: run.mode, status: run.status })
 })
 

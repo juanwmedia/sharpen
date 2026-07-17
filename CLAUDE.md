@@ -14,15 +14,15 @@ anything you remember about those libraries.
 ```
 engine/       Deterministic git arena. Framework-agnostic: runs in the
               browser, in server replay, and (v2) in a CI Action.
-  types.ts    THE shared contract: Challenge, Check, Evidence, Locale,
+  types.ts    THE shared contract: Scenario, Check, Evidence, Locale,
               Localized, ARENA_EVENT, MENTOR_ERROR_KIND, ARENA_DEFAULT_BRANCH.
-  arena.ts    createArena(challenge): InMemoryFs + git init + setup + bash
+  arena.ts    createArena(scenario): InMemoryFs + git init + setup + bash
               with our porcelain. Fixed clock (BASE_TIMESTAMP + tick).
   porcelain/  Hand-written `git` subcommands over isomorphic-git.
   fs-bridge.ts just-bash IFileSystem -> isomorphic-git PromiseFsClient.
 server/       Express + SSE. Authoritative timer, transcript replay,
               evidence + leaderboard (~/.sharpen/), mentor process spawner.
-challenges/   Registry + schema-1 packages (see package/FORMAT.md) + slug.ts.
+scenarios/    Registry + schema-1 packages (see package/FORMAT.md) + slug.ts.
 src/          Vue 3 SPA, Feature-Sliced Design (see below).
 test/         Vitest. Run with `npm test`.
 skills/       The Claude Code plugin skill that boots the arena.
@@ -32,7 +32,7 @@ skills/       The Claude Code plugin skill that boots the arena.
 
 - **Determinism.** Same transcript must produce the same OIDs and stateHash
   everywhere, forever: fixed clock, fixed author, no `Date.now()` or
-  randomness anywhere in engine or challenge setup/assert paths. Server-side
+  randomness anywhere in engine or scenario setup/assert paths. Server-side
   replay is the only authority; the browser verdict is a preview.
 - **State-based validation.** `assert` inspects the snapshot (refs, index,
   working tree), NEVER the typed commands. Any correct solution must pass.
@@ -81,7 +81,7 @@ skills/       The Claude Code plugin skill that boots the arena.
 - intlify treats bare `@` and `|` inside messages as syntax and the failure
   is a RUNTIME SyntaxError that unmounts the component subtree. Escape as
   `{'@'}` / `{'|'}`.
-- Challenge content (briefing, objective, check name/detail) is bilingual by contract:
+- Scenario content (briefing, objective, check name/detail) is bilingual by contract:
   `Localized = Record<Locale, string>`, the author writes every language and
   TypeScript enforces completeness. English is canonical: mentor prompts and
   evidence always use `.en`. The web picks with `lt()` from `@/shared/i18n`.
@@ -92,12 +92,12 @@ skills/       The Claude Code plugin skill that boots the arena.
 
 - FSD layers, import direction only downward:
   `app > pages > widgets > features > entities > shared` (plus `@engine` /
-  `@challenges` aliases to the repo root). Every slice exposes an `index.ts`
+  `@scenarios` aliases to the repo root). Every slice exposes an `index.ts`
   public API; import through it, not into slice internals.
 - Game state is the singleton store `src/entities/game/model/store.ts`
   (`useGame()`). Non-reactive engine handles (arena, EventSource, terminal
-  writer) stay module-level; the Challenge object is `markRaw`ed. Navigation
-  belongs to vue-router (`/challenge/:slug`, slug from `challenges/slug.ts`,
+  writer) stay module-level; the Scenario object is `markRaw`ed. Navigation
+  belongs to vue-router (`/challenge/:slug`, slug from `scenarios/slug.ts`,
   SPA fallback in `server/app.ts`); the store signals via registered
   handlers, it never imports the router.
 - No hardcoded repeated strings: statuses, bubble roles, SSE event names and
@@ -122,13 +122,13 @@ skills/       The Claude Code plugin skill that boots the arena.
   false): 20 rows exactly fill the frame so a fresh terminal shows no
   scrollbar. ANSI codes come from `@/shared/lib/ansi.ts`.
 
-## Adding a challenge
+## Adding a scenario
 
 Scenarios are **packages** (folder + schema 1). **Source of truth for authors
-and agents:** `challenges/package/FORMAT.md` (layout, file roles, boilerplate,
-checklist). Canonical example: `challenges/git/clean-sweep/`.
+and agents:** `scenarios/package/FORMAT.md` (layout, file roles, boilerplate,
+checklist). Canonical example: `scenarios/git/clean-sweep/`.
 
-1. Copy `challenges/git/clean-sweep/` to `challenges/<pack>/<name>/` and edit
+1. Copy `scenarios/git/clean-sweep/` to `scenarios/<pack>/<name>/` and edit
    `scenario.md`, `walkthrough.md`, `setup.ts`, `assert.ts` (keep `index.ts`
    wiring via `assembleScenario`).
 2. `setup(env)`: build the repo with the env helpers (write/add/commit/
@@ -140,7 +140,7 @@ checklist). Canonical example: `challenges/git/clean-sweep/`.
 4. Copy lives in `scenario.md` (bilingual Briefing/Objective sections) and
    `spec.tree` for git; `walkthrough.md` is English only (mentor reveal);
    `themes` are soft UI concept chips (not solving commands).
-5. Register it in `challenges/index.ts`. The URL becomes
+5. Register it in `scenarios/index.ts`. The URL becomes
    `/<pack>/<slugify(title)>`; `test/slug.test.ts` guards collisions.
 6. If it needs a git subcommand the porcelain lacks, extend
    `engine/porcelain/git-command.ts` with faithful output and add cases to

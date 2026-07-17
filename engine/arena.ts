@@ -6,19 +6,19 @@ import { createGitCommand } from './porcelain/git-command.ts'
 import { dirname, join } from './paths.ts'
 import { takeSnapshot, stateHash } from './snapshot.ts'
 import { ARENA_DEFAULT_BRANCH } from './types.ts'
-import type { Arena, Challenge, ChallengeSetupEnv } from './types.ts'
+import type { Arena, Scenario, ScenarioSetupEnv } from './types.ts'
 
 export const REPO_DIR = '/repo'
 const SETUP_AUTHOR = { name: 'Riley Ortega', email: 'riley@sharpen.local' }
-// 2026-01-01T00:00:00Z. A fixed clock keeps challenge OIDs deterministic,
+// 2026-01-01T00:00:00Z. A fixed clock keeps scenario OIDs deterministic,
 // which is what makes evidence replayable byte for byte.
 const BASE_TIMESTAMP = 1767225600
 
-// One arena = one challenge attempt: a fresh virtual filesystem shared by the
-// shell and git, a repo built by the challenge's deterministic setup, and a
+// One arena = one scenario attempt: a fresh virtual filesystem shared by the
+// shell and git, a repo built by the scenario's deterministic setup, and a
 // bash whose `git` is our porcelain. Runs identically in browser and Node;
 // that symmetry is what makes CI replay validation possible later.
-export async function createArena(challenge: Challenge): Promise<Arena> {
+export async function createArena(scenario: Scenario): Promise<Arena> {
   const jbFs = new InMemoryFs()
   const gitFs = createGitFs(jbFs)
   // GitFs erases the named PromiseFsClient keys behind a Record (see
@@ -32,7 +32,7 @@ export async function createArena(challenge: Challenge): Promise<Arena> {
   await jbFs.mkdir(dir, { recursive: true })
   await git.init({ fs, dir, defaultBranch: ARENA_DEFAULT_BRANCH })
 
-  const setup: ChallengeSetupEnv = {
+  const setup: ScenarioSetupEnv = {
     fs: jbFs,
     git,
     gitFs,
@@ -60,7 +60,7 @@ export async function createArena(challenge: Challenge): Promise<Arena> {
       await git.checkout({ fs, dir, ref })
     },
   }
-  await challenge.setup(setup)
+  await scenario.setup(setup)
 
   const gitCommand = createGitCommand({ gitFs, jbFs, dir, clock })
   const bash = new Bash({
@@ -79,7 +79,7 @@ export async function createArena(challenge: Challenge): Promise<Arena> {
   let cwd = dir
 
   return {
-    challenge,
+    scenario,
     jbFs,
     gitFs,
     bash,
@@ -98,7 +98,7 @@ export async function createArena(challenge: Challenge): Promise<Arena> {
     snapshot: () => takeSnapshot({ fs: gitFs, dir }),
     async verdict() {
       const snapshot = await takeSnapshot({ fs: gitFs, dir })
-      const result = await challenge.assert({ snapshot, fs: jbFs, gitFs, git, dir })
+      const result = await scenario.assert({ snapshot, fs: jbFs, gitFs, git, dir })
       return { ...result, stateHash: await stateHash(snapshot) }
     },
   }

@@ -22,6 +22,8 @@ export interface LearnMentorItem {
 
 export interface LearnSnapshot {
   schema: 1
+  /** Persisted schema-1 key: stays `challengeId` on disk (files predate the
+   * Challenge -> Scenario rename). */
   challengeId: string
   locale: Locale
   status: LearnStatus
@@ -34,8 +36,8 @@ export interface LearnSnapshot {
 
 const learnDir = join(dataDir, 'learn')
 
-function snapshotPath(challengeId: string): string {
-  return join(learnDir, `${challengeId.replaceAll('/', '__')}.json`)
+function snapshotPath(scenarioId: string): string {
+  return join(learnDir, `${scenarioId.replaceAll('/', '__')}.json`)
 }
 
 async function ensureLearnDir(): Promise<void> {
@@ -49,11 +51,11 @@ export function sanitizeMentorFeed(feed: LearnMentorItem[]): LearnMentorItem[] {
     .map(({ role, text, meta }) => (meta ? { role, text, meta } : { role, text }))
 }
 
-export function parseLearnSnapshot(raw: unknown, challengeId: string): LearnSnapshot | null {
+export function parseLearnSnapshot(raw: unknown, scenarioId: string): LearnSnapshot | null {
   if (!raw || typeof raw !== 'object') return null
   const body = raw as Record<string, unknown>
   if (body.schema !== 1) return null
-  if (body.challengeId !== challengeId) return null
+  if (body.challengeId !== scenarioId) return null
   const locale = LOCALES.find((l) => l === body.locale) ?? DEFAULT_LOCALE
   const status = LEARN_STATUSES.find((s) => s === body.status)
   if (!status) return null
@@ -80,7 +82,7 @@ export function parseLearnSnapshot(raw: unknown, challengeId: string): LearnSnap
   const mentorTurns = typeof body.mentorTurns === 'number' && body.mentorTurns >= 0 ? body.mentorTurns : 0
   return {
     schema: 1,
-    challengeId,
+    challengeId: scenarioId,
     locale,
     status,
     transcript,
@@ -91,10 +93,10 @@ export function parseLearnSnapshot(raw: unknown, challengeId: string): LearnSnap
   }
 }
 
-export async function loadLearn(challengeId: string): Promise<LearnSnapshot | null> {
+export async function loadLearn(scenarioId: string): Promise<LearnSnapshot | null> {
   try {
-    const raw = JSON.parse(await readFile(snapshotPath(challengeId), 'utf8')) as unknown
-    return parseLearnSnapshot(raw, challengeId)
+    const raw = JSON.parse(await readFile(snapshotPath(scenarioId), 'utf8')) as unknown
+    return parseLearnSnapshot(raw, scenarioId)
   } catch {
     return null
   }
@@ -115,9 +117,9 @@ export async function saveLearn(snapshot: LearnSnapshot): Promise<void> {
   await writeFile(snapshotPath(snapshot.challengeId), JSON.stringify(cleaned, null, 2))
 }
 
-export async function deleteLearn(challengeId: string): Promise<void> {
+export async function deleteLearn(scenarioId: string): Promise<void> {
   try {
-    await unlink(snapshotPath(challengeId))
+    await unlink(snapshotPath(scenarioId))
   } catch {
     /* already gone */
   }

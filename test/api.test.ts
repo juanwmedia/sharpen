@@ -17,15 +17,15 @@ const { app, runs } = await import('../server/app.ts')
 async function createRun(mode?: 'learn' | 'challenge'): Promise<string> {
   const res = await request(app)
     .post('/api/runs')
-    .send({ challengeId: 'git/clean-sweep', player: 'tester', ...(mode ? { mode } : {}) })
+    .send({ scenarioId: 'git/clean-sweep', player: 'tester', ...(mode ? { mode } : {}) })
   expect(res.status).toBe(200)
   if (mode) expect(res.body.mode).toBe(mode)
   return res.body.runId as string
 }
 
 describe('sharpen API', () => {
-  it('lists challenge summaries without engine internals', async () => {
-    const res = await request(app).get('/api/challenges')
+  it('lists scenario summaries without engine internals', async () => {
+    const res = await request(app).get('/api/scenarios')
     expect(res.status).toBe(200)
     expect(Array.isArray(res.body)).toBe(true)
     const [first] = res.body as Array<Record<string, unknown>>
@@ -36,7 +36,7 @@ describe('sharpen API', () => {
       difficulty: 'medium',
       timeLimitMs: 60_000,
     })
-    // Challenge content is bilingual: authors write every language.
+    // Scenario content is bilingual: authors write every language.
     expect(typeof (first!.briefing as Record<string, unknown>).en).toBe('string')
     expect(typeof (first!.briefing as Record<string, unknown>).es).toBe('string')
     expect(typeof first!.tree).toBe('string')
@@ -147,6 +147,7 @@ describe('sharpen API', () => {
     const id = encodeURIComponent('git/clean-sweep')
     const body = {
       schema: 1,
+      // Persisted schema-1 key: the wire and disk format keeps challengeId.
       challengeId: 'git/clean-sweep',
       locale: 'en',
       status: 'live',
@@ -174,7 +175,7 @@ describe('sharpen API', () => {
     expect(empty.body).toBeNull()
   })
 
-  it('learn API rejects unknown challenge ids', async () => {
+  it('learn API rejects unknown scenario ids', async () => {
     const id = encodeURIComponent('git/nope')
     expect((await request(app).get(`/api/learn/${id}`)).status).toBe(404)
     expect((await request(app).put(`/api/learn/${id}`).send({ schema: 1 })).status).toBe(404)

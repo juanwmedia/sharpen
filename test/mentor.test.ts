@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
-import cleanSweep from '../challenges/git/clean-sweep/index.ts'
+import cleanSweep from '../scenarios/git/clean-sweep/index.ts'
 import { MENTOR_BUBBLE } from '../engine/types.ts'
 import {
   buildMentorPrompt,
@@ -265,7 +265,7 @@ describe('buildMentorPrompt', () => {
     const prompt = buildMentorPrompt({
       phase: MENTOR_PHASE.open,
       trigger: MENTOR_TRIGGER.chat,
-      challenge: cleanSweep,
+      scenario: cleanSweep,
       board: boardSample,
       transcript: [],
       checks: [],
@@ -288,7 +288,7 @@ describe('buildMentorPrompt', () => {
     const prompt = buildMentorPrompt({
       phase: MENTOR_PHASE.open,
       trigger: MENTOR_TRIGGER.submitFail,
-      challenge: cleanSweep,
+      scenario: cleanSweep,
       board: boardSample,
       transcript: [{ command: 'git status', output: '...' }],
       checks: failChecks,
@@ -306,7 +306,7 @@ describe('buildMentorPrompt', () => {
       phase: MENTOR_PHASE.closed,
       howClosed: MENTOR_HOW_CLOSED.revealed,
       trigger: MENTOR_TRIGGER.reveal,
-      challenge: cleanSweep,
+      scenario: cleanSweep,
       board: boardSample,
       transcript: [],
       checks: failChecks,
@@ -322,7 +322,7 @@ describe('buildMentorPrompt', () => {
       phase: MENTOR_PHASE.closed,
       howClosed: MENTOR_HOW_CLOSED.passed,
       trigger: MENTOR_TRIGGER.submitPass,
-      challenge: cleanSweep,
+      scenario: cleanSweep,
       board: boardSample,
       transcript: [{ command: 'git clean -fd' }],
       checks: failChecks.map((c) => ({ ...c, pass: true, detail: { en: 'ok', es: 'ok' } })),

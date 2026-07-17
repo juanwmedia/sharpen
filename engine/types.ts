@@ -33,10 +33,10 @@ export const MENTOR_BUBBLE = {
 } as const
 export type MentorBubble = (typeof MENTOR_BUBBLE)[keyof typeof MENTOR_BUBBLE]
 
-/** Branch every arena repo is initialized on; challenges may assume it. */
+/** Branch every arena repo is initialized on; scenarios may assume it. */
 export const ARENA_DEFAULT_BRANCH = 'main'
 
-/** Player-facing text a challenge author writes in every supported language.
+/** Player-facing text a scenario author writes in every supported language.
  * English stays canonical for mentor prompts and evidence readability. */
 export type Localized = Record<Locale, string>
 
@@ -62,7 +62,7 @@ export interface Snapshot {
   log: Array<{ oid: string; message: string }>
 }
 
-export interface ChallengeSetupEnv {
+export interface ScenarioSetupEnv {
   fs: IFileSystem
   git: typeof isogit
   gitFs: GitFs
@@ -75,7 +75,7 @@ export interface ChallengeSetupEnv {
   checkout(ref: string): Promise<void>
 }
 
-export interface ChallengeAssertContext {
+export interface ScenarioAssertContext {
   snapshot: Snapshot
   fs: IFileSystem
   gitFs: GitFs
@@ -83,7 +83,7 @@ export interface ChallengeAssertContext {
   dir: string
 }
 
-export interface Challenge {
+export interface Scenario {
   id: string
   pack: string
   title: string
@@ -100,12 +100,12 @@ export interface Challenge {
   /** Canonical solution, revealed by the mentor after timeout (challenge) or
    * voluntary reveal (learn). English only: it feeds the mentor. */
   walkthrough: string
-  setup(env: ChallengeSetupEnv): Promise<void>
-  assert(ctx: ChallengeAssertContext): Promise<{ pass: boolean; checks: Check[] }>
+  setup(env: ScenarioSetupEnv): Promise<void>
+  assert(ctx: ScenarioAssertContext): Promise<{ pass: boolean; checks: Check[] }>
 }
 
-export type ChallengeSummary = Pick<
-  Challenge,
+export type ScenarioSummary = Pick<
+  Scenario,
   'id' | 'pack' | 'title' | 'difficulty' | 'timeLimitMs' | 'briefing' | 'tree' | 'objective' | 'themes'
 >
 
@@ -115,7 +115,7 @@ export interface GitFs {
 }
 
 export interface Arena {
-  challenge: Challenge
+  scenario: Scenario
   jbFs: IFileSystem
   gitFs: GitFs
   bash: Bash
@@ -132,6 +132,8 @@ export interface Evidence {
   schema: 1
   engineVersion: string
   runId: string
+  /** Persisted schema-1 key: stays `challengeId` on disk (the entity renamed
+   * to Scenario in code, but evidence files predate that and v2 replays them). */
   challengeId: string
   player: string
   startedAt: number

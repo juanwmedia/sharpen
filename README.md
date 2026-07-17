@@ -61,8 +61,8 @@ Two ways to play, one switch in the top bar:
 
 The arena speaks English and Spanish: switch with the EN/ES toggle in the top
 bar (persisted locally, English by default). The mentor answers in your
-language too. Challenge content (briefing, objective, and verdict checks) is
-written in both languages by the challenge author and the type system enforces
+language too. Scenario content (briefing, objective, and verdict checks) is
+written in both languages by the scenario author and the type system enforces
 it; the ASCII tree and titles/URL slugs stay in English, and the emulated git
 speaks English like the real one.
 
@@ -119,10 +119,10 @@ npm test           # vitest: porcelain, verdicts, fs bridge, mentor queue, API, 
 npm run typecheck  # vue-tsc --noEmit
 ```
 
-To add a challenge: create a package folder `challenges/<pack>/<name>/` with
+To add a scenario: create a package folder `scenarios/<pack>/<name>/` with
 `scenario.md` (schema 1 frontmatter + bilingual sections), `walkthrough.md`,
-`setup.ts`, and `assert.ts`, then register it in `challenges/index.ts`. See
-`challenges/package/FORMAT.md`. Its URL becomes `/<pack>/<slug-of-title>`.
+`setup.ts`, and `assert.ts`, then register it in `scenarios/index.ts`. See
+`scenarios/package/FORMAT.md`. Its URL becomes `/<pack>/<slug-of-title>`.
 
 Architecture, contracts and conventions live in `CLAUDE.md`. Verified
 third-party API facts (just-bash, isomorphic-git, wterm, claude CLI, vue-i18n)
@@ -130,10 +130,10 @@ live in `docs/api-notes.md`: read them before touching engine code.
 
 ## Roadmap
 
-- **v1 (now):** local arena, git pack with the first challenge, local ranking.
+- **v1 (now):** local arena, git pack with the first scenario, local ranking.
 - **v2:** shared ranking. Submissions via GitHub Issues (identity signed by
   GitHub), CI Action replays every transcript with the same engine and
   regenerates the leaderboard; only verified entries count.
-- **v3:** nonce-seeded challenges plus GitHub server timestamps, making claimed
+- **v3:** nonce-seeded scenarios plus GitHub server timestamps, making claimed
   times attack-resistant. More packs: TypeScript (Monaco editor), Unix 101. A
   challenge declares its artifact; the arena does not change.

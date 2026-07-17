@@ -2,12 +2,12 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { assembleScenario } from '../challenges/package/assemble.ts'
-import { parseScenarioMd } from '../challenges/package/parse-scenario-md.ts'
-import cleanSweep from '../challenges/git/clean-sweep/index.ts'
+import { assembleScenario } from '../scenarios/package/assemble.ts'
+import { parseScenarioMd } from '../scenarios/package/parse-scenario-md.ts'
+import cleanSweep from '../scenarios/git/clean-sweep/index.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const packageDir = join(here, '../challenges/git/clean-sweep')
+const packageDir = join(here, '../scenarios/git/clean-sweep')
 
 function minimalScenario(overrides: {
   frontmatter?: string

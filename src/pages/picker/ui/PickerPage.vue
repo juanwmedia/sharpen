@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { slugify } from '@challenges/slug.ts'
+import { slugify } from '@scenarios/slug.ts'
 import { useGame } from '@/entities/game/index.ts'
 import { ROUTE_NAMES } from '@/shared/config/index.ts'
 import { lt } from '@/shared/i18n/index.ts'
@@ -37,7 +37,7 @@ function enterArena(c: { pack: string; title: string }): void {
       </i18n-t>
       <div class="mt-7 grid gap-3.5">
         <button
-          v-for="c in state.challenges"
+          v-for="c in state.scenarios"
           :key="c.id"
           class="panel grid cursor-pointer gap-2 px-[22px] py-5 text-left text-ink transition-[border-color,transform] duration-150 outline-none hover:-translate-y-px hover:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line))] focus-visible:-translate-y-px focus-visible:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line))]"
           type="button"

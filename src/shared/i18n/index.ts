@@ -24,7 +24,7 @@ export const i18n = createI18n({
 /** t() usable outside components (the game store writes terminal lines). */
 export const t = i18n.global.t
 
-/** Picks the active language from author-written challenge content. Reactive
+/** Picks the active language from author-written scenario content. Reactive
  * in templates: reading locale.value subscribes the component render. */
 export function lt(text: Localized): string {
   return text[i18n.global.locale.value as Locale]

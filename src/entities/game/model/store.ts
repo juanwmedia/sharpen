@@ -1,7 +1,7 @@
 import { markRaw, reactive, readonly } from 'vue'
 import type { FsClient } from 'isomorphic-git'
 import type { ExecResult } from 'just-bash'
-import { getChallenge } from '@challenges/index.ts'
+import { getScenario } from '@scenarios/index.ts'
 import { createArena } from '@engine/arena.ts'
 import {
   ARENA_DEFAULT_BRANCH,
@@ -14,7 +14,7 @@ import {
 import type {
   Arena,
   Check,
-  ChallengeSummary,
+  ScenarioSummary,
   LeaderboardRow,
   MentorBubble,
   MentorErrorKind,
@@ -45,6 +45,7 @@ interface LearnTranscriptEntry {
 
 interface LearnSnapshot {
   schema: 1
+  /** Persisted schema-1 key: stays `challengeId` on disk and on the wire. */
   challengeId: string
   locale: string
   status: 'live' | 'passed' | 'revealed'
@@ -68,10 +69,10 @@ function storedRunMode(): RunMode {
 const state = reactive<GameState>({
   player: '',
   engineVersion: '',
-  challenges: [],
+  scenarios: [],
   leaderboard: [],
   mode: storedRunMode(),
-  challenge: null,
+  scenario: null,
   runId: null,
   status: RUN_STATUS.idle,
   deadline: 0,
@@ -165,7 +166,7 @@ async function boot(): Promise<void> {
   const meta = await getJson<{ player: string; engineVersion: string }>(apiRoutes.meta)
   state.player = meta.player
   state.engineVersion = meta.engineVersion
-  state.challenges = await getJson<ChallengeSummary[]>(apiRoutes.challenges)
+  state.scenarios = await getJson<ScenarioSummary[]>(apiRoutes.scenarios)
 }
 
 async function refreshLeaderboard(): Promise<void> {
@@ -180,7 +181,7 @@ function learnPersistStatus(): LearnSnapshot['status'] | null {
 }
 
 function scheduleLearnSave(): void {
-  if (state.mode !== 'learn' || !state.challenge) return
+  if (state.mode !== 'learn' || !state.scenario) return
   const persistStatus = learnPersistStatus()
   if (!persistStatus) return
   if (learnSaveTimer) clearTimeout(learnSaveTimer)
@@ -191,12 +192,12 @@ function scheduleLearnSave(): void {
 }
 
 async function persistLearnNow(): Promise<void> {
-  if (state.mode !== 'learn' || !state.challenge) return
+  if (state.mode !== 'learn' || !state.scenario) return
   const persistStatus = learnPersistStatus()
   if (!persistStatus) return
   const snapshot: LearnSnapshot = {
     schema: 1,
-    challengeId: state.challenge.id,
+    challengeId: state.scenario.id,
     locale: currentLocale(),
     status: persistStatus,
     transcript: learnTranscript.map((t) => ({
@@ -208,12 +209,12 @@ async function persistLearnNow(): Promise<void> {
     mentorTurns,
     updatedAt: Date.now(),
   }
-  await putJson(apiRoutes.learn(state.challenge.id), snapshot).catch(() => {})
+  await putJson(apiRoutes.learn(state.scenario.id), snapshot).catch(() => {})
 }
 
-async function fetchLearnSnapshot(challengeId: string): Promise<LearnSnapshot | null> {
+async function fetchLearnSnapshot(scenarioId: string): Promise<LearnSnapshot | null> {
   try {
-    const res = await fetch(apiRoutes.learn(challengeId))
+    const res = await fetch(apiRoutes.learn(scenarioId))
     if (!res.ok) return null
     const data = (await res.json()) as LearnSnapshot | null
     return data
@@ -243,39 +244,39 @@ function resetClientRunFields(): void {
   state.countdownNum = null
 }
 
-/** Challenge mode only: load the scenario into the UI without creating a
+/** Scenario mode only: load the scenario into the UI without creating a
  * server run. The timer starts when beginChallenge() calls startRun. */
-function prepareScenario(challengeId: string): void {
-  const challenge = getChallenge(challengeId)
-  if (!challenge) return
+function prepareScenario(scenarioId: string): void {
+  const scenario = getScenario(scenarioId)
+  if (!scenario) return
   resetClientRunFields()
-  // markRaw: a Challenge carries setup/assert functions; proxying it deeply
+  // markRaw: a Scenario carries setup/assert functions; proxying it deeply
   // would be pure overhead (and reactivity on it is never needed).
-  state.challenge = markRaw(challenge)
+  state.scenario = markRaw(scenario)
   state.status = RUN_STATUS.briefing
 }
 
 /** Modal Start (challenge) or Arena mount (learn): create the server run,
  * optional countdown, then go live. */
-async function startRun(challengeId: string): Promise<void> {
-  const challenge = getChallenge(challengeId)
-  if (!challenge) return
+async function startRun(scenarioId: string): Promise<void> {
+  const scenario = getScenario(scenarioId)
+  if (!scenario) return
 
   resetClientRunFields()
 
-  const snapshot = state.mode === 'learn' ? await fetchLearnSnapshot(challengeId) : null
+  const snapshot = state.mode === 'learn' ? await fetchLearnSnapshot(scenarioId) : null
 
   // Locale + mode ride along so the server steers timer and mentor language.
   const { runId } = await postJson<{ runId: string }>(apiRoutes.runs, {
-    challengeId,
+    scenarioId,
     locale: currentLocale(),
     mode: state.mode,
   })
 
-  state.challenge = markRaw(challenge)
+  state.scenario = markRaw(scenario)
   state.runId = runId
 
-  arena = await createArena(challenge)
+  arena = await createArena(scenario)
   connectEvents(runId)
 
   if (snapshot && state.mode === 'learn') {
@@ -316,8 +317,8 @@ async function startRun(challengeId: string): Promise<void> {
 }
 
 async function beginChallenge(): Promise<void> {
-  if (state.status !== RUN_STATUS.briefing || !state.challenge) return
-  await startRun(state.challenge.id)
+  if (state.status !== RUN_STATUS.briefing || !state.scenario) return
+  await startRun(state.scenario.id)
 }
 
 /** Rubric from the local arena: same assert() as the server, no submit side effects. */
@@ -330,7 +331,7 @@ async function refreshChecks(): Promise<void> {
 // Called when the arena page unmounts (back button, browser back, run lost):
 // the run's client-side life ends here. Idempotent.
 function leaveRun(): void {
-  if (state.mode === 'learn' && state.challenge) {
+  if (state.mode === 'learn' && state.scenario) {
     if (learnSaveTimer) {
       clearTimeout(learnSaveTimer)
       learnSaveTimer = null
@@ -353,18 +354,18 @@ async function revealSolution(): Promise<void> {
 }
 
 async function wipeLearn(): Promise<void> {
-  if (state.mode !== 'learn' || !state.challenge) return
-  const challengeId = state.challenge.id
+  if (state.mode !== 'learn' || !state.scenario) return
+  const scenarioId = state.scenario.id
   if (learnSaveTimer) {
     clearTimeout(learnSaveTimer)
     learnSaveTimer = null
   }
-  await deleteJson(apiRoutes.learn(challengeId)).catch(() => {})
+  await deleteJson(apiRoutes.learn(scenarioId)).catch(() => {})
   events?.close()
   events = null
   state.status = RUN_STATUS.idle
   state.runId = null
-  await startRun(challengeId)
+  await startRun(scenarioId)
 }
 
 // ---------- terminal integration -------------------------------------------
@@ -549,7 +550,7 @@ function connectEvents(runId: string): void {
   events.addEventListener(ARENA_EVENT.timeout, () => {
     if (state.mode === 'learn') return
     state.status = RUN_STATUS.revealed
-    const seconds = Math.round((state.challenge?.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS) / 1000)
+    const seconds = Math.round((state.scenario?.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS) / 1000)
     termWrite(ansi.yellow(t('terminal.timeout', { seconds })) + CRLF)
     void fetch(apiRoutes.runExpire(runId), { method: 'POST' }).catch(() => {})
   })

@@ -3,7 +3,7 @@
 
 export const apiRoutes = {
   meta: '/api/meta',
-  challenges: '/api/challenges',
+  scenarios: '/api/scenarios',
   leaderboard: '/api/leaderboard',
   runs: '/api/runs',
   run: (id: string) => `/api/runs/${id}`,
@@ -15,7 +15,7 @@ export const apiRoutes = {
   runReveal: (id: string) => `/api/runs/${id}/reveal`,
   runRestore: (id: string) => `/api/runs/${id}/restore`,
   runExpire: (id: string) => `/api/runs/${id}/expire`,
-  learn: (challengeId: string) => `/api/learn/${encodeURIComponent(challengeId)}`,
+  learn: (scenarioId: string) => `/api/learn/${encodeURIComponent(scenarioId)}`,
 } as const
 
 export async function getJson<T>(url: string): Promise<T> {

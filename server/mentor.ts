@@ -5,7 +5,7 @@ import {
   DEFAULT_LOCALE,
   MENTOR_BUBBLE,
   MENTOR_ERROR_KIND,
-  type Challenge,
+  type Scenario,
   type Check,
   type Locale,
   type MentorBubble,
@@ -53,7 +53,7 @@ export const MENTOR_PROMPT = {
   transcript: 'Terminal transcript:',
   checks: 'Checks:',
   walkthrough: 'Canonical walkthrough (source of truth):',
-  challenge: 'Challenge:',
+  scenario: 'Scenario:',
   goal: 'Goal:',
   nothingTyped: '(nothing typed yet)',
   noneYet: '(none yet)',
@@ -67,7 +67,7 @@ export const MENTOR_PROMPT = {
 } as const
 
 const SYSTEM_PROMPT = `You are the sharpen arena mentor: a Socratic senior engineer watching a player
-solve a Git challenge in an emulated terminal.
+solve a Git scenario in an emulated terminal.
 
 Hard rules:
 - When the user message says ${MENTOR_PROMPT.open}, NEVER name the exact command or flags that
@@ -87,7 +87,7 @@ export interface MentorPromptInput {
   phase: MentorPhase
   howClosed?: MentorHowClosed
   trigger: MentorTrigger
-  challenge: Challenge
+  scenario: Scenario
   board: string
   transcript: Array<{ command: string; output?: string }>
   checks: Check[]
@@ -361,7 +361,7 @@ Answer Socratically in 1-2 sentences.`
   if (trigger === MENTOR_TRIGGER.submitPass) {
     const dur = durationSec != null ? ` Solved in ${Math.round(durationSec)}s.` : ''
     return `${closed}${dur}
-Congratulate briefly, name the ONE concept this challenge was about, then offer to answer questions.`
+Congratulate briefly, name the ONE concept this scenario was about, then offer to answer questions.`
   }
   if (trigger === MENTOR_TRIGGER.timeout) {
     return `${closed}
@@ -378,14 +378,14 @@ Answer concretely.`
 
 /** Single Open/Closed context builder for every mentor entry point. */
 export function buildMentorPrompt(input: MentorPromptInput): string {
-  const { challenge, board, transcript, checks, phase } = input
+  const { scenario, board, transcript, checks, phase } = input
   // Prompts always use canonical English content; the mentor answers in the
   // player's language on its own (see LANGUAGE_RULES).
   const parts = [
     triggerHeader(input),
     '',
-    `${MENTOR_PROMPT.challenge} ${challenge.title}`,
-    `${MENTOR_PROMPT.goal} ${challenge.objective.en}`,
+    `${MENTOR_PROMPT.scenario} ${scenario.title}`,
+    `${MENTOR_PROMPT.goal} ${scenario.objective.en}`,
     '',
     MENTOR_PROMPT.repoBoard,
     board || MENTOR_PROMPT.emptyBoard,
@@ -398,7 +398,7 @@ export function buildMentorPrompt(input: MentorPromptInput): string {
   ]
 
   if (phase === MENTOR_PHASE.closed) {
-    parts.push('', MENTOR_PROMPT.walkthrough, challenge.walkthrough)
+    parts.push('', MENTOR_PROMPT.walkthrough, scenario.walkthrough)
   }
 
   return parts.join('\n')

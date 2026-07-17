@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createArena } from '../engine/arena.ts'
 import { BOARD_LINE, formatBoard } from '../engine/board.ts'
-import cleanSweep from '../challenges/git/clean-sweep/index.ts'
+import cleanSweep from '../scenarios/git/clean-sweep/index.ts'
 
 describe('formatBoard', () => {
   it('summarizes Clean sweep initial mess', async () => {

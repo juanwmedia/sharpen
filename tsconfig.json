@@ -15,7 +15,7 @@
     "jsx": "preserve",
     "paths": {
       "@engine/*": ["./engine/*"],
-      "@challenges/*": ["./challenges/*"],
+      "@scenarios/*": ["./scenarios/*"],
       "@/*": ["./src/*"]
     }
   },
@@ -23,10 +23,10 @@
     "src/**/*",
     "engine/**/*",
     "server/**/*",
-    "challenges/**/*",
+    "scenarios/**/*",
     "test/**/*",
     "vite.config.ts",
-    "challenges/package/md-shim.d.ts"
+    "scenarios/package/md-shim.d.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

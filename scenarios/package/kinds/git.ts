@@ -1,10 +1,10 @@
-import type { Challenge, ChallengeAssertContext, ChallengeSetupEnv, Check } from '../../../engine/types.ts'
+import type { Scenario, ScenarioAssertContext, ScenarioSetupEnv, Check } from '../../../engine/types.ts'
 import type { GitScenarioSpec, ParsedScenarioMd } from '../types.ts'
 import { DEFAULT_TIME_LIMIT_MS } from '../types.ts'
 
-export type ChallengeSetup = (env: ChallengeSetupEnv) => Promise<void>
-export type ChallengeAssert = (
-  ctx: ChallengeAssertContext
+export type ScenarioSetup = (env: ScenarioSetupEnv) => Promise<void>
+export type ScenarioAssert = (
+  ctx: ScenarioAssertContext
 ) => Promise<{ pass: boolean; checks: Check[] }>
 
 function parseGitSpec(spec: Record<string, unknown> | undefined): GitScenarioSpec {
@@ -14,12 +14,12 @@ function parseGitSpec(spec: Record<string, unknown> | undefined): GitScenarioSpe
   return { tree: spec.tree.replace(/\n$/, '') }
 }
 
-export function assembleGitChallenge(
+export function assembleGitScenario(
   parsed: ParsedScenarioMd,
   walkthroughSrc: string,
-  setup: ChallengeSetup,
-  assert: ChallengeAssert
-): Challenge {
+  setup: ScenarioSetup,
+  assert: ScenarioAssert
+): Scenario {
   const { manifest, briefing, objective } = parsed
   const { tree } = parseGitSpec(manifest.spec)
   const walkthrough = walkthroughSrc.trim()

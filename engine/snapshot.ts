@@ -8,7 +8,7 @@ function asFsClient(gitFs: GitFs): FsClient {
   return gitFs as unknown as FsClient
 }
 
-// A snapshot is the single source of truth for challenge assertions and for
+// A snapshot is the single source of truth for scenario assertions and for
 // the evidence state hash. Assertions inspect repo STATE, never what the
 // player typed, so any correct solution passes.
 export async function takeSnapshot({ fs: gitFs, dir }: { fs: GitFs; dir: string }): Promise<Snapshot> {
@@ -64,7 +64,7 @@ export const FILE_STATUS = {
 } as const
 export type FileStatus = (typeof FILE_STATUS)[keyof typeof FILE_STATUS]
 
-// Convenience accessors so challenge assert() functions stay readable.
+// Convenience accessors so scenario assert() functions stay readable.
 export function statusOf(snapshot: Snapshot, filepath: string): FileStatus {
   const row = snapshot.status.find(([file]) => file === filepath)
   if (!row) return FILE_STATUS.absent

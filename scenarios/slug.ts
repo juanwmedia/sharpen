@@ -1,5 +1,5 @@
-// URL slugs derive from the challenge TITLE (one slug across languages:
-// challenge content is not translated). Deliberately ASCII-only and stable:
+// URL slugs derive from the scenario TITLE (one slug across languages:
+// scenario content is not translated). Deliberately ASCII-only and stable:
 // slugs are public URLs.
 const COMBINING_MARKS = /[\u0300-\u036f]/g
 

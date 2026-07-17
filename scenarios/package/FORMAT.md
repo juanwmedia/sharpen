@@ -1,16 +1,16 @@
 # Scenario package format (schema 1)
 
 A scenario is a **folder you can zip and share**. The loader turns it into the
-runtime `Challenge` object the arena already understands. UI copy (briefing,
+runtime `Scenario` object the arena already understands. UI copy (briefing,
 objective, tree) is never hardcoded in the product: it is read from the package.
 
-Canonical example: [`challenges/git/clean-sweep/`](../git/clean-sweep/).
+Canonical example: [`scenarios/git/clean-sweep/`](../git/clean-sweep/).
 Copy that folder when adding a git scenario.
 
 ## Layout
 
 ```text
-challenges/<pack>/<name>/
+scenarios/<pack>/<name>/
   scenario.md       # YAML frontmatter + localized sections
   walkthrough.md    # English mentor reveal (body only)
   setup.ts          # deterministic initial state
@@ -18,7 +18,7 @@ challenges/<pack>/<name>/
   index.ts          # assembleScenario(...) + default export
 ```
 
-Register the package explicitly in [`challenges/index.ts`](../index.ts)
+Register the package explicitly in [`scenarios/index.ts`](../index.ts)
 (no filesystem scan). Display order = array order.
 
 ## File roles
@@ -95,9 +95,9 @@ Describe the canonical approach and note that any state-correct solution passes.
 
 ```ts
 // setup.ts
-import type { ChallengeSetupEnv } from '../../../engine/types.ts'
+import type { ScenarioSetupEnv } from '../../../engine/types.ts'
 
-export async function setup(env: ChallengeSetupEnv): Promise<void> {
+export async function setup(env: ScenarioSetupEnv): Promise<void> {
   await env.write('README.md', '# demo\n')
   await env.add('README.md')
   await env.commit('init')
@@ -105,17 +105,17 @@ export async function setup(env: ChallengeSetupEnv): Promise<void> {
 }
 ```
 
-`ChallengeSetupEnv` helpers: `write`, `remove`, `add`, `commit`, `branch`,
+`ScenarioSetupEnv` helpers: `write`, `remove`, `add`, `commit`, `branch`,
 `checkout`, plus `fs` / `git` / `dir` if needed. Deterministic only: no
 `Date.now()`, no randomness (arena supplies fixed clock and author).
 
 ```ts
 // assert.ts
 import { statusOf, untrackedFiles } from '../../../engine/snapshot.ts'
-import type { ChallengeAssertContext, Check } from '../../../engine/types.ts'
+import type { ScenarioAssertContext, Check } from '../../../engine/types.ts'
 
 export async function assert(
-  ctx: ChallengeAssertContext
+  ctx: ScenarioAssertContext
 ): Promise<{ pass: boolean; checks: Check[] }> {
   const checks: Check[] = []
   // Inspect ctx.snapshot (and ctx.fs for file bytes). Never the transcript.
@@ -146,11 +146,11 @@ export default assembleScenario({
 
 ## Register
 
-In `challenges/index.ts`:
+In `scenarios/index.ts`:
 
 ```ts
-import newChallenge from './git/my-scenario/index.ts'
-export const challenges: Challenge[] = [cleanSweep, newChallenge]
+import newScenario from './git/my-scenario/index.ts'
+export const scenarios: Scenario[] = [cleanSweep, newScenario]
 ```
 
 ## Authoring invariants (humans and agents)
@@ -167,16 +167,16 @@ export const challenges: Challenge[] = [cleanSweep, newChallenge]
 
 ## Adding a scenario (checklist)
 
-1. Copy `challenges/git/clean-sweep/` to `challenges/<pack>/<name>/`.
+1. Copy `scenarios/git/clean-sweep/` to `scenarios/<pack>/<name>/`.
 2. Edit `scenario.md`, `walkthrough.md`, `setup.ts`, `assert.ts` (keep `index.ts`
    shape unless imports change).
-3. Import and append in `challenges/index.ts`.
+3. Import and append in `scenarios/index.ts`.
 4. Run the gate. `test/slug.test.ts` fails on title/slug collisions.
 
 ## Adding a future kind
 
-1. Extend `ScenarioKind` in `challenges/package/types.ts`.
-2. Add `challenges/package/kinds/<kind>.ts` assembler.
+1. Extend `ScenarioKind` in `scenarios/package/types.ts`.
+2. Add `scenarios/package/kinds/<kind>.ts` assembler.
 3. Branch in `assemble.ts`.
 4. Document kind-specific `spec` keys here. Do not bump `schema` unless the
    **core** contract breaks.
