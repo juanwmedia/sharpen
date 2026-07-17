@@ -22,7 +22,6 @@ const dryRun = process.argv.includes('--dry-run')
 const SMOKE_PORT = 4519
 const SMOKE_SCENARIO = 'git/clean-sweep'
 const SMOKE_SOLUTION = 'git clean -fd'
-const VERSION_FEED = 'https://frontendleap.com/sharpen/version.json'
 
 const sh = (cmd) => execSync(cmd, { cwd: root, stdio: 'inherit' })
 const capture = (cmd) => execSync(cmd, { cwd: root }).toString().trim()
@@ -119,8 +118,9 @@ if (dryRun) {
 step(`publishing ${tag}`)
 sh(`gh release create ${tag} "${artifactPath}" "${artifactPath}.sha256" --target main --title "sharpen ${tag}" --generate-notes`)
 rmSync(outDir, { recursive: true, force: true })
+// Publishing IS the announcement: the update check reads the latest release
+// tag straight from GitHub, so there is no version feed to refresh.
 console.log(`\nrelease: ${tag} published`)
-console.log(`release: REMINDER: update ${VERSION_FEED} to {"latest": "${version}"}`)
 
 async function smokeTest(stageDir) {
   const dataDir = mkdtempSync(join(tmpdir(), 'sharpen-smoke-'))

@@ -183,12 +183,13 @@ vocabulary, boilerplate, checklist). Canonical example:
   launch skill downloads the exact-version asset to
   `~/.sharpen/app/<version>` with checksum verification and falls back to
   building from source, so `dist/` stays out of git and `tsx` plus runtime
-  deps stay in `dependencies`, never `devDependencies`. After each release,
-  update `https://frontendleap.com/sharpen/version.json` (`{"latest": "x.y.z"}`,
-  lives in the fl-next repo): the server checks it once per boot
-  (`server/update-check.ts`, `SHARPEN_NO_UPDATE_CHECK=1` and VITEST skip it)
-  and `/api/meta.updateAvailable` paints the update chip; the skill does the
-  same check and suggests `/plugin update sharpen`.
+  deps stay in `dependencies`, never `devDependencies`. The update notice
+  needs no extra step: the server asks GitHub for the latest release tag
+  once per boot (`server/update-check.ts`; `SHARPEN_NO_UPDATE_CHECK=1` and
+  VITEST skip it; the API requires a User-Agent header) and
+  `/api/meta.updateAvailable` paints the update chip; the skill does the
+  same check and suggests `/plugin update sharpen`. Publishing the release
+  IS what flips the notice on: there is no version feed to drift.
 - Browser verification happens in isolated contexts (chrome-devtools
   `isolatedContext`), never in the user's tab. If a verification run records
   a result, remove its entry from `~/.sharpen/leaderboard.json` and its file

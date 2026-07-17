@@ -43,10 +43,11 @@ watch the game from this session.
 5. Tell the user the arena is running and at which URL. Mention that closing
    this Claude Code session stops the server.
 6. Update notice (best effort, never blocks or delays the launch): fetch
-   `curl -fsSL -m 3 https://frontendleap.com/sharpen/version.json` and read
-   its `latest` field. If it is a newer version than `$VERSION`, tell the
-   user a newer sharpen exists and that `/plugin update sharpen` gets it.
-   On any fetch error or missing field, say nothing about updates.
+   `curl -fsSL -m 3 https://api.github.com/repos/juanwmedia/sharpen/releases/latest`
+   and read its `tag_name` field (e.g. `v0.1.4`). If it names a newer version
+   than `$VERSION`, tell the user a newer sharpen exists and that
+   `/plugin update sharpen` gets it. On any fetch error or missing field,
+   say nothing about updates.
 
 ## Fallback: build from source
 
