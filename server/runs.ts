@@ -7,11 +7,9 @@ import {
   ARENA_EVENT,
   DEFAULT_LOCALE,
   DEFAULT_RUN_MODE,
-  MENTOR_BUBBLE,
   type ArenaEventName,
   type Challenge,
   type Locale,
-  type MentorBubble,
   type RunMode,
   type Verdict,
 } from '../engine/types.ts'
@@ -54,8 +52,6 @@ export interface Run {
   timer: NodeJS.Timeout | null
   clients: Set<Response>
   mentor: Mentor | null
-  /** Bubble kind for the mentor turn currently streaming (or next ask). */
-  mentorBubble: MentorBubble
   /** Seeds for Mentor when restoring a learn session. */
   mentorSessionId: string | null
   mentorTurns: number
@@ -103,7 +99,6 @@ export class RunStore {
       timer: null,
       clients: new Set(),
       mentor: null,
-      mentorBubble: MENTOR_BUBBLE.mentor,
       mentorSessionId: null,
       mentorTurns: 0,
       restoredStatus: null,

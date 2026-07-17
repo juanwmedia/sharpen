@@ -47,8 +47,11 @@ skills/       The Claude Code plugin skill that boots the arena.
   replays and re-scores these files.
 - **Mentor.** One `Mentor` per run; each turn spawns
   `claude -p --model $SHARPEN_MENTOR_MODEL --tools ""` (default sonnet),
-  prompt via stdin, `--session-id`/`--resume` for memory. Queue: MAX_TURNS 8,
-  MAX_QUEUE 3, hints coalesce. Socratic guardrail lives in the prompts: while
+  prompt via stdin, `--session-id`/`--resume` for memory. NO turn budget, in
+  any mode, by design: the mentor runs on the player's own subscription.
+  Queue: MAX_QUEUE 3, hints coalesce, queued prompts are BUILDERS resolved at
+  drain time (live board/clock), and the bubble kind travels with each turn.
+  Socratic guardrail lives in the prompts: while
   LIVE it never names the solving command; after timeout it reveals and
   teaches. Tests set `SHARPEN_NO_MENTOR=1` and inject `spawnFn`.
 - **Nudge gate.** A failed validation only asks the mentor when the Enter

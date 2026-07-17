@@ -2,9 +2,9 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 import cleanSweep from '../challenges/git/clean-sweep/index.ts'
+import { MENTOR_BUBBLE } from '../engine/types.ts'
 import {
   buildMentorPrompt,
-  MAX_TURNS,
   Mentor,
   MENTOR_HOW_CLOSED,
   MENTOR_PHASE,
@@ -187,18 +187,59 @@ describe('Mentor queue', () => {
     expect(onError).not.toHaveBeenCalled()
   })
 
-  it('rejects asks beyond the turn budget with mentor-budget', async () => {
+  it('has no turn budget: every ask keeps spawning, in any quantity', async () => {
     const { mentor, children, onError } = harness()
 
-    for (let i = 0; i < MAX_TURNS; i++) {
+    // Well past the old cap of 8: the mentor runs on the player's own
+    // subscription, so nothing rations it.
+    for (let i = 0; i < 12; i++) {
       expect(mentor.ask(`q${i}`)).toBe(true)
       await complete(children[i]!)
     }
-    expect(children).toHaveLength(MAX_TURNS)
+    expect(children).toHaveLength(12)
+    expect(mentor.turns).toBe(12)
+    expect(onError).not.toHaveBeenCalled()
+  })
 
-    expect(mentor.ask('one too many')).toBe(false)
-    expect(onError).toHaveBeenCalledWith('mentor-budget', expect.stringContaining('turn budget'))
-    expect(children).toHaveLength(MAX_TURNS)
+  it('resolves queued prompt builders at drain time, not enqueue time', async () => {
+    const { mentor, children } = harness()
+
+    mentor.ask('q1')
+    let board = 'stale'
+    const builder = vi.fn(async () => `state: ${board}`)
+    expect(mentor.ask(builder)).toBe(true)
+    expect(builder).not.toHaveBeenCalled()
+
+    // The state moves while the question waits in the queue.
+    board = 'fresh'
+    await complete(children[0]!)
+    await tick()
+    expect(builder).toHaveBeenCalledTimes(1)
+    expect(children[1]!.stdinData).toBe('state: fresh')
+    await complete(children[1]!)
+  })
+
+  it('the bubble kind travels with each turn, not with the latest ask', async () => {
+    const { mentor, children, onDelta } = harness()
+
+    mentor.ask('q1')
+    mentor.ask('reveal it', { bubble: MENTOR_BUBBLE.reveal })
+
+    // Deltas of the first turn keep its bubble even though a reveal ask is
+    // already queued behind it.
+    children[0]!.stdout.write(
+      JSON.stringify({ type: 'stream_event', event: { delta: { type: 'text_delta', text: 'hi' } } }) + '\n'
+    )
+    await tick()
+    expect(onDelta).toHaveBeenLastCalledWith('hi', MENTOR_BUBBLE.mentor)
+    await complete(children[0]!)
+
+    children[1]!.stdout.write(
+      JSON.stringify({ type: 'stream_event', event: { delta: { type: 'text_delta', text: 'walkthrough' } } }) + '\n'
+    )
+    await tick()
+    expect(onDelta).toHaveBeenLastCalledWith('walkthrough', MENTOR_BUBBLE.reveal)
+    await complete(children[1]!)
   })
 
   it('surfaces the stderr tail on non-zero exit and still drains the queue', async () => {

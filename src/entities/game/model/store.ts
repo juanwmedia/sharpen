@@ -105,7 +105,6 @@ let pendingTerminalReplay: LearnTranscriptEntry[] | null = null
 
 /** Server error kinds mapped to localized bubbles (see server/mentor.ts). */
 const MENTOR_ERROR_KEYS: Record<MentorErrorKind, string> = {
-  [MENTOR_ERROR_KIND.budget]: 'mentorError.budget',
   [MENTOR_ERROR_KIND.busy]: 'mentorError.busy',
   [MENTOR_ERROR_KIND.unavailable]: 'mentorError.unavailable',
   [MENTOR_ERROR_KIND.failed]: 'mentorError.failed',
@@ -383,9 +382,18 @@ export async function execCommand(command: string): Promise<ExecResult> {
 
 let pendingCommandBubble: MentorItem | null = null
 
+/** New conversation items land BEFORE the thinking indicator: the mentor
+ * composing is always the newest thing happening, so it stays at the bottom
+ * even when commands keep arriving mid-turn. */
+function pushBeforeThinking(item: MentorItem): void {
+  const idx = state.mentorFeed.findIndex((m) => m.role === MENTOR_ROLE.thinking)
+  if (idx === -1) state.mentorFeed.push(item)
+  else state.mentorFeed.splice(idx, 0, item)
+}
+
 function flushCommandBubble(): void {
   if (!pendingCommandBubble) return
-  state.mentorFeed.push(pendingCommandBubble)
+  pushBeforeThinking(pendingCommandBubble)
   pendingCommandBubble = null
 }
 
@@ -486,11 +494,11 @@ export async function tabCandidates(word: string, isFirstWord: boolean): Promise
 async function askMentor(question: string): Promise<void> {
   const trimmed = question.trim()
   if (!trimmed || !state.runId) return
-  state.mentorFeed.push({ role: MENTOR_ROLE.you, text: trimmed })
+  pushBeforeThinking({ role: MENTOR_ROLE.you, text: trimmed })
   scheduleLearnSave()
-  // Rejections (budget reached, queue full) surface through the SSE
-  // mentor-error event with a localized bubble, so the response body is not
-  // inspected here: doing both painted the same failure twice.
+  // Rejections (queue full) surface through the SSE mentor-error event with a
+  // localized bubble, so the response body is not inspected here: doing both
+  // painted the same failure twice.
   await fetch(apiRoutes.runAsk(state.runId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -502,9 +510,9 @@ async function askMentor(question: string): Promise<void> {
 
 function pushMentorError(kind: string, detail: string): void {
   const key = MENTOR_ERROR_KEYS[kind as MentorErrorKind]
-  // Budget/busy are self-explanatory; the other kinds keep the raw detail as
-  // a secondary line because it names the actual failure (e.g. missing CLI).
-  const keepDetail = kind !== MENTOR_ERROR_KIND.budget && kind !== MENTOR_ERROR_KIND.busy
+  // Busy is self-explanatory; the other kinds keep the raw detail as a
+  // secondary line because it names the actual failure (e.g. missing CLI).
+  const keepDetail = kind !== MENTOR_ERROR_KIND.busy
   const item: MentorItem = key
     ? { role: MENTOR_ROLE.system, text: t(key), ...(keepDetail ? { meta: detail } : {}) }
     : { role: MENTOR_ROLE.system, text: detail }

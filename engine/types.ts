@@ -170,7 +170,6 @@ export type ArenaEventName = (typeof ARENA_EVENT)[keyof typeof ARENA_EVENT]
 /** Mentor failure kinds carried by the mentor-error event; the web maps each
  * to a localized bubble. */
 export const MENTOR_ERROR_KIND = {
-  budget: 'mentor-budget',
   busy: 'mentor-busy',
   unavailable: 'mentor-unavailable',
   failed: 'mentor-error',

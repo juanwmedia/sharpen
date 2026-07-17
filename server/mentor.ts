@@ -3,19 +3,22 @@ import { randomUUID } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import {
   DEFAULT_LOCALE,
+  MENTOR_BUBBLE,
   MENTOR_ERROR_KIND,
   type Challenge,
   type Check,
   type Locale,
+  type MentorBubble,
   type MentorErrorKind,
 } from '../engine/types.ts'
 
 // One Mentor per run. Spawns `claude -p` per turn (open-design pattern: the
 // server creates agent turns; nothing blocks waiting on the model) and keeps
 // conversation memory via --resume. Text-only: --tools "" disables everything.
+// There is NO turn budget, in any mode: the mentor runs on the player's own
+// Claude subscription, so capping it protects nobody and bricks learn runs.
 
 const MODEL = process.env.SHARPEN_MENTOR_MODEL ?? 'sonnet'
-export const MAX_TURNS = 8
 const INACTIVITY_MS = 90_000
 
 export const MENTOR_PHASE = {
@@ -101,6 +104,16 @@ const LANGUAGE_RULES: Record<Locale, string> = {
 
 const MAX_QUEUE = 3
 
+/** A prompt string, or a builder invoked when the turn actually starts: a
+ * queued turn must see the board and clock as they are at drain time, not as
+ * they were when the request was enqueued. */
+export type MentorPromptSource = string | (() => string | Promise<string>)
+
+interface QueuedAsk {
+  source: MentorPromptSource
+  bubble: MentorBubble
+}
+
 /** claude's exact complaint when a --resume target no longer exists. */
 const NO_CONVERSATION_RE = /No conversation found with session ID/i
 
@@ -122,7 +135,8 @@ export type SpawnFn = (
 ) => MentorChild
 
 export interface MentorOptions {
-  onDelta: (text: string) => void
+  /** Receives each text chunk with the bubble kind of the turn it belongs to. */
+  onDelta: (text: string, bubble: MentorBubble) => void
   onDone: () => void
   onError: (kind: MentorErrorKind, detail: string) => void
   /** Injectable process spawner so tests can fake the claude CLI. */
@@ -142,7 +156,7 @@ interface StreamEvent {
 }
 
 export class Mentor {
-  onDelta: (text: string) => void
+  onDelta: (text: string, bubble: MentorBubble) => void
   onDone: () => void
   onError: (kind: MentorErrorKind, detail: string) => void
   spawnFn: SpawnFn
@@ -150,7 +164,7 @@ export class Mentor {
   sessionId: string | null = null
   turns = 0
   busy = false
-  queue: string[] = []
+  queue: QueuedAsk[] = []
 
   constructor({ onDelta, onDone, onError, spawnFn, locale, sessionId, turns }: MentorOptions) {
     this.onDelta = onDelta
@@ -166,27 +180,44 @@ export class Mentor {
   // questions that arrive mid-turn are queued and drained in order. Hints pass
   // `coalesce: true`: if the mentor is already speaking, a second hint about
   // the same failure adds nothing, so it merges into the ongoing turn.
-  ask(prompt: string, { coalesce = false }: { coalesce?: boolean } = {}): boolean {
-    if (this.turns + this.queue.length >= MAX_TURNS) {
-      this.onError(MENTOR_ERROR_KIND.budget, 'The mentor reached its turn budget for this run.')
-      return false
-    }
+  ask(
+    source: MentorPromptSource,
+    { coalesce = false, bubble = MENTOR_BUBBLE.mentor }: { coalesce?: boolean; bubble?: MentorBubble } = {}
+  ): boolean {
     if (this.busy) {
       if (coalesce) return true
       if (this.queue.length >= MAX_QUEUE) {
-        this.onError(MENTOR_ERROR_KIND.busy, 'One question at a time: the mentor is still answering.')
+        this.onError(MENTOR_ERROR_KIND.busy, 'The mentor is mid-answer and the queue is full. Give it a moment.')
         return false
       }
-      this.queue.push(prompt)
+      this.queue.push({ source, bubble })
       return true
     }
-    this._run(prompt)
+    void this._run({ source, bubble })
     return true
   }
 
-  _run(prompt: string): boolean {
+  _drainNext(): void {
+    const next = this.queue.shift()
+    if (next) void this._run(next)
+  }
+
+  async _run({ source, bubble }: QueuedAsk): Promise<void> {
     this.busy = true
     this.turns += 1
+
+    // Builders resolve here, when the turn starts, so a drained queue entry
+    // reads live run state instead of the snapshot it was enqueued with.
+    let prompt: string
+    try {
+      prompt = typeof source === 'function' ? await source() : source
+    } catch (err) {
+      this.busy = false
+      this.turns -= 1
+      this.onError(MENTOR_ERROR_KIND.failed, String(err instanceof Error ? err.message : err))
+      this._drainNext()
+      return
+    }
 
     const args = [
       '-p',
@@ -210,7 +241,9 @@ export class Mentor {
     } catch (err) {
       this.busy = false
       this.onError(MENTOR_ERROR_KIND.unavailable, String(err instanceof Error ? err.message : err))
-      return false
+      // Drain anyway: a stuck queue would let later asks jump ahead of it.
+      this._drainNext()
+      return
     }
 
     let sawText = false
@@ -221,8 +254,7 @@ export class Mentor {
       this.busy = false
       if (kind === 'done') this.onDone()
       else this.onError(kind, detail)
-      const next = this.queue.shift()
-      if (next) this._run(next)
+      this._drainNext()
     }
     let watchdog = setTimeout(() => child.kill('SIGTERM'), INACTIVITY_MS)
     const poke = () => {
@@ -254,12 +286,12 @@ export class Mentor {
         const delta = event.event?.delta
         if (delta?.type === 'text_delta' && delta.text) {
           sawText = true
-          this.onDelta(delta.text)
+          this.onDelta(delta.text, bubble)
         }
       } else if (event.type === 'result') {
         // Fallback for runs where partial chunks were not emitted.
         if (!sawText && typeof event.result === 'string') {
-          this.onDelta(event.result)
+          this.onDelta(event.result, bubble)
         }
       }
     })
@@ -276,7 +308,7 @@ export class Mentor {
         this.busy = false
         this.turns -= 1
         this.sessionId = null
-        this._run(prompt)
+        void this._run({ source: prompt, bubble })
         return
       }
       finish(MENTOR_ERROR_KIND.failed, stderrTail || `claude exited with code ${code}`)
@@ -284,7 +316,6 @@ export class Mentor {
 
     child.stdin.write(prompt)
     child.stdin.end()
-    return true
   }
 }
 

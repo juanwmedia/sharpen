@@ -32,6 +32,7 @@ import {
   MENTOR_TRIGGER,
   buildMentorPrompt,
   type MentorHowClosed,
+  type MentorPromptSource,
   type MentorTrigger,
 } from './mentor.ts'
 import { baselineOf, shouldNudge } from './nudge.ts'
@@ -80,8 +81,7 @@ function mentorFor(run: Run): Mentor {
       locale: run.locale,
       sessionId: run.mentorSessionId,
       turns: run.mentorTurns,
-      onDelta: (text) =>
-        runs.emit(run, ARENA_EVENT.mentorDelta, { text, bubble: run.mentorBubble }),
+      onDelta: (text, bubble) => runs.emit(run, ARENA_EVENT.mentorDelta, { text, bubble }),
       onDone: () => {
         slog(`run=${run.id} mentor turn done`)
         run.mentorSessionId = run.mentor?.sessionId ?? null
@@ -105,7 +105,7 @@ function mentorFor(run: Run): Mentor {
 // that silence must have a face.
 function askMentor(
   run: Run,
-  prompt: string,
+  source: MentorPromptSource,
   opts?: { coalesce?: boolean; bubble?: MentorBubble }
 ): boolean {
   // Hermetic-test escape hatch: SHARPEN_NO_MENTOR=1 skips spawning the claude
@@ -113,9 +113,8 @@ function askMentor(
   // exports a built app instance, not a builder, so an env flag is the
   // cleanest seam. No mentor events are emitted and asks report accepted=false.
   if (process.env.SHARPEN_NO_MENTOR === '1') return false
-  run.mentorBubble = opts?.bubble ?? MENTOR_BUBBLE.mentor
   const mentor = mentorFor(run)
-  const accepted = mentor.ask(prompt, opts)
+  const accepted = mentor.ask(source, opts)
   slog(`run=${run.id} mentor ask accepted=${accepted} turns=${mentor.turns} queued=${mentor.queue.length}`)
   if (accepted) runs.emit(run, ARENA_EVENT.mentorThinking, {})
   return accepted
@@ -157,18 +156,26 @@ function mentorPromptFor(
   })
 }
 
-async function mentorFromInspect(
+function mentorFromInspect(
   run: Run,
   trigger: MentorTrigger,
   opts?: { playerQuestion?: string; bubble?: MentorBubble; coalesce?: boolean }
-): Promise<boolean> {
-  const { snapshot, verdict } = await runs.inspect(run)
-  const prompt = mentorPromptFor(run, trigger, {
-    snapshot,
-    checks: verdict.checks,
-    playerQuestion: opts?.playerQuestion,
-  })
-  return askMentor(run, prompt, { bubble: opts?.bubble, coalesce: opts?.coalesce })
+): boolean {
+  // The prompt is a builder on purpose: it resolves when the mentor actually
+  // picks the turn up, so a question queued behind a long answer sees the
+  // board, transcript and clock as they are then, not as they were on ask.
+  return askMentor(
+    run,
+    async () => {
+      const { snapshot, verdict } = await runs.inspect(run)
+      return mentorPromptFor(run, trigger, {
+        snapshot,
+        checks: verdict.checks,
+        playerQuestion: opts?.playerQuestion,
+      })
+    },
+    { bubble: opts?.bubble, coalesce: opts?.coalesce }
+  )
 }
 
 app.get('/api/meta', async (_req, res) => {
@@ -241,7 +248,7 @@ app.post('/api/runs/:id/start', async (req, res) => {
   runs.start(run, (timedOut) => {
     slog(`run=${timedOut.id} timeout`)
     runs.emit(timedOut, ARENA_EVENT.timeout, {})
-    void mentorFromInspect(timedOut, MENTOR_TRIGGER.timeout, { bubble: MENTOR_BUBBLE.reveal })
+    mentorFromInspect(timedOut, MENTOR_TRIGGER.timeout, { bubble: MENTOR_BUBBLE.reveal })
   })
   if (wasReady) {
     // Seed the nudge gate with the opening board (or the restored transcript
@@ -287,7 +294,7 @@ app.post('/api/runs/:id/reveal', async (req, res) => {
     return res.status(409).json({ error: `cannot reveal: mode=${run.mode} status=${run.status}` })
   }
   slog(`run=${run.id} reveal`)
-  await mentorFromInspect(run, MENTOR_TRIGGER.reveal, { bubble: MENTOR_BUBBLE.reveal })
+  mentorFromInspect(run, MENTOR_TRIGGER.reveal, { bubble: MENTOR_BUBBLE.reveal })
   res.status(204).end()
 })
 
@@ -360,7 +367,7 @@ app.post('/api/runs/:id/ask', async (req, res) => {
   if (!run) return res.status(404).json({ error: 'unknown run' })
   const question = String(req.body?.question ?? '').slice(0, QUESTION_MAX_CHARS)
   if (!question.trim()) return res.status(400).json({ error: 'empty question' })
-  const accepted = await mentorFromInspect(run, MENTOR_TRIGGER.chat, { playerQuestion: question })
+  const accepted = mentorFromInspect(run, MENTOR_TRIGGER.chat, { playerQuestion: question })
   res.status(accepted ? 202 : 429).json({ accepted })
 })
 

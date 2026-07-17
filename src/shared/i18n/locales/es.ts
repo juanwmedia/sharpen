@@ -74,8 +74,7 @@ export default {
     thinking: 'pensando…',
   },
   mentorError: {
-    budget: 'El mentor ha alcanzado su límite de turnos en este intento.',
-    busy: 'Una pregunta cada vez: el mentor todavía está respondiendo.',
+    busy: 'El mentor está terminando una respuesta y la cola está llena. Dale un momento.',
     unavailable: 'El mentor no está disponible: instala y autentica Claude Code para activarlo.',
     failed: 'El mentor ha fallado en ese turno. Prueba otra vez.',
   },

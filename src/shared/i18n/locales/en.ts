@@ -76,8 +76,7 @@ export default {
     thinking: 'thinking…',
   },
   mentorError: {
-    budget: 'The mentor reached its turn budget for this run.',
-    busy: 'One question at a time: the mentor is still answering.',
+    busy: 'The mentor is mid-answer and the queue is full. Give it a moment.',
     unavailable: 'The mentor is unavailable: install and authenticate Claude Code to enable it.',
     failed: 'The mentor failed on that turn. Try again.',
   },

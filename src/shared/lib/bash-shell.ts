@@ -76,7 +76,16 @@ export class TermShell {
       this._cursor = 0
       write('\r\n')
       if (!command.trim()) {
-        if (this._onSubmit) await this._onSubmit()
+        // Busy here too: an empty-Enter submit is a network round-trip, and
+        // input arriving mid-flight must not interleave with it.
+        if (this._onSubmit) {
+          this._busy = true
+          try {
+            await this._onSubmit()
+          } finally {
+            this._busy = false
+          }
+        }
         write(this._prompt())
         return
       }
