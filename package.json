@@ -1,6 +1,6 @@
 {
   "name": "sharpen",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Sharpen by FrontendLeap. Timed Git challenges in your browser, with a Socratic AI mentor. A Claude Code plugin.",
   "type": "module",
   "private": true,

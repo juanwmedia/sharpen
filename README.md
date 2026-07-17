@@ -19,7 +19,8 @@
 Then run `/sharpen` in any Claude Code session. The first boot downloads the
 prebuilt arena for your plugin version (a few MB, seconds; it builds from
 source only if the download is not possible); after that it just starts a
-local server and opens the arena in your browser.
+local server and opens the arena in your browser. Stop it anytime with
+`/sharpen stop`.
 Each scenario has its own URL (`/git/clean-sweep`), so you can deep-link
 straight into a run.
 

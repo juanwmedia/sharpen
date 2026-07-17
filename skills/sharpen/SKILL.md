@@ -1,26 +1,51 @@
 ---
 name: sharpen
-description: Launch the sharpen arena, a local web app with timed Git challenges, a real in-browser Git terminal, and a Socratic AI mentor. Use when the user wants to practice, play, or "sharpen" their Git skills.
+description: Launch or stop the sharpen arena, a local web app with timed Git challenges, a real in-browser Git terminal, and a Socratic AI mentor. Use when the user wants to practice, play, or "sharpen" their Git skills, and when they want the arena server stopped.
 model: sonnet
 ---
 
 # sharpen: launch the arena
 
-You are the launcher for the sharpen arena. Your job is to get the local
-server running (downloading the prebuilt app on first boot), hand the user
-the URL, and get out of the way. The mentoring itself is done by a headless
-`claude` process the server spawns per turn; you do NOT mentor, grade, or
-watch the game from this session.
+You are the launcher and stopper for the sharpen arena. Your job is to get
+the local server running (downloading the prebuilt app on first boot), hand
+the user the URL, and get out of the way; and to shut the server down when
+asked. The mentoring itself is done by a headless `claude` process the
+server spawns per turn; you do NOT mentor, grade, or watch the game from
+this session.
 
-## Steps
+The arena listens on port 4517 by default (`SHARPEN_PORT` overrides; 4518
+is the fallback). "Is sharpen running on a port" is always answered the
+same way: `curl -fsS -m 2 http://127.0.0.1:<port>/api/meta` succeeding and
+returning JSON with an `engineVersion` field.
 
-1. Preflight: run `node --version`. If Node is missing or older than 20, stop
-   and tell the user to install Node 20+ first; that is the only hard
+## Stopping (`/sharpen stop`)
+
+If the user invoked this skill with `stop` (or is asking to stop, quit or
+shut down the arena):
+
+1. Check ports 4517 and 4518 with the meta probe above.
+2. For each port where sharpen answers, kill its process:
+   - macOS/Linux: `lsof -ti :<port> | xargs kill`
+   - Windows: `netstat -ano | findstr :<port>` then `taskkill /PID <pid> /F`
+3. Confirm with the meta probe (it must now fail) and tell the user the
+   arena is stopped. In-memory runs die with it; learn progress is safe on
+   disk. If nothing was listening, say the arena was not running.
+
+Never kill a port where the meta probe did not identify sharpen: that is
+some other app's server.
+
+## Launching
+
+1. Already running? Probe port 4517 (and 4518). If sharpen answers, do NOT
+   launch a second server: give the user the URL, mention `/sharpen stop`,
+   and end your turn.
+2. Preflight: run `node --version`. If Node is missing or older than 20,
+   stop and tell the user to install Node 20+ first; that is the only hard
    requirement. Also check `claude` is on PATH (see Rules if it is not).
-2. Resolve the app. Read the plugin version:
+3. Resolve the app. Read the plugin version:
    `VERSION=$(node -p "require('${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json').version")`
    The prebuilt app for that version lives at `~/.sharpen/app/$VERSION`.
-   If that directory exists, skip to step 3. Otherwise download the release
+   If that directory exists, skip to step 4. Otherwise download the release
    artifact (a few MB, seconds):
    - Download both files from
      `https://github.com/juanwmedia/sharpen/releases/download/v$VERSION/`:
@@ -34,15 +59,15 @@ watch the game from this session.
      Afterwards delete other versions under `~/.sharpen/app/`.
    If the download is impossible (offline, blocked network, missing release),
    fall back to building from source; see Fallback below.
-3. Start the server in the background:
+4. Start the server in the background:
    `node ~/.sharpen/app/$VERSION/server/server.mjs`
-   It prints `sharpen listening on http://127.0.0.1:<port>` when ready
-   (default port 4517, override with the `SHARPEN_PORT` env var).
-4. Open the printed URL in the user's browser: `open <url>` on macOS,
+   It prints `sharpen listening on http://127.0.0.1:<port>` when ready.
+5. Open the printed URL in the user's browser: `open <url>` on macOS,
    `xdg-open <url>` on Linux, `cmd.exe /c start <url>` on Windows.
-5. Tell the user the arena is running and at which URL. Mention that closing
-   this Claude Code session stops the server.
-6. Update notice (best effort, never blocks or delays the launch): fetch
+6. Tell the user the arena is running, at which URL, and how to stop it:
+   `/sharpen stop` anytime, and closing this Claude Code session stops it
+   too.
+7. Update notice (best effort, never blocks or delays the launch): fetch
    `curl -fsSL -m 3 https://api.github.com/repos/juanwmedia/sharpen/releases/latest`
    and read its `tag_name` field (e.g. `v0.1.4`). If it names a newer version
    than `$VERSION`, tell the user a newer sharpen exists and that
@@ -71,7 +96,8 @@ fix), retry, and only then report what is wrong in plain words.
 
 - Do not keep polling the server or the game state. Once launched, your turn
   ends. The server owns the game loop.
-- If the port is busy, retry once with `SHARPEN_PORT=4518`.
+- If port 4517 is busy but the meta probe says it is NOT sharpen, launch
+  with `SHARPEN_PORT=4518` instead.
 - If `claude` CLI is not on PATH, the arena still works but the mentor panel
   will show a setup notice; tell the user the mentor needs Claude Code
   installed and authenticated. On Windows the mentor needs the native
