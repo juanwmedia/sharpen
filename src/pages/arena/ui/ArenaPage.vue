@@ -12,7 +12,7 @@ import { ScenarioBriefing } from '@/widgets/scenario-briefing/index.ts'
 import { TerminalPane } from '@/widgets/terminal-pane/index.ts'
 import { TimerRing } from '@/widgets/run-timer/index.ts'
 import { VerdictPanel } from '@/widgets/verdict-panel/index.ts'
-import { DEFAULT_TIME_LIMIT_MS, ROUTE_NAMES } from '@/shared/config/index.ts'
+import { DEFAULT_TIME_LIMIT_MS, ROUTE_NAMES, SWAP_SHORTCUT_CODES } from '@/shared/config/index.ts'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -21,6 +21,20 @@ const { state, prepareScenario, startRun, beginChallenge, leaveRun, askMentor, r
   useGame()
 
 const inBriefing = computed(() => state.status === RUN_STATUS.briefing)
+
+const terminalPane = ref<InstanceType<typeof TerminalPane> | null>(null)
+const chatPane = ref<InstanceType<typeof MentorChat> | null>(null)
+
+// Ctrl + the physical key above Tab cycles focus terminal <-> chat, hands
+// never leaving the keyboard. Capture phase: it must win over wterm's own
+// key handling when the terminal has focus.
+function onSwapShortcut(e: KeyboardEvent): void {
+  if (!e.ctrlKey || e.metaKey || e.altKey || !SWAP_SHORTCUT_CODES.includes(e.code)) return
+  if (inBriefing.value) return
+  e.preventDefault()
+  if (terminalPane.value?.hasFocus()) chatPane.value?.focus()
+  else terminalPane.value?.focus()
+}
 
 // The URL owns the scenario: /:pack/:slug (e.g. /git/clean-sweep). Learn
 // starts immediately; challenge waits on the briefing modal until Start.
@@ -34,6 +48,7 @@ onMounted(() => {
     return
   }
   registerRunLostHandler(() => void router.replace({ name: ROUTE_NAMES.picker }))
+  window.addEventListener('keydown', onSwapShortcut, true)
   if (state.mode === 'challenge') {
     prepareScenario(challenge.id)
   } else {
@@ -42,6 +57,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onSwapShortcut, true)
   registerRunLostHandler(() => {})
   leaveRun()
 })
@@ -81,18 +97,27 @@ const terminalPinned = ref(true)
           :tree="state.challenge.tree"
           :objective="state.challenge.objective"
           :themes="state.challenge.themes"
+          collapsible
+          :start-open="state.mode === 'learn'"
         />
       </div>
       <template v-if="!inBriefing">
         <div :class="{ 'sticky top-3 z-10': terminalPinned }">
           <TerminalPane
             v-if="state.challenge"
+            ref="terminalPane"
             :key="state.runId ?? ''"
             :pinned="terminalPinned"
             @toggle-pin="terminalPinned = !terminalPinned"
           />
         </div>
-        <MentorChat :feed="state.mentorFeed" :busy="state.mentorBusy" :status="state.status" @ask="askMentor" />
+        <MentorChat
+          ref="chatPane"
+          :feed="state.mentorFeed"
+          :busy="state.mentorBusy"
+          :status="state.status"
+          @ask="askMentor"
+        />
       </template>
     </section>
 

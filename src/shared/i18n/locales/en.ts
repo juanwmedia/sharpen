@@ -114,6 +114,9 @@ export default {
     onError: 'Speaks when you hit an error',
     note: 'The chat always answers you. Solving (and the timeout reveal) always speaks.',
   },
+  shortcut: {
+    swap: 'Ctrl + the key above Tab (` or º) swaps focus between the terminal and the chat',
+  },
   verdict: {
     eyebrow: 'verdict',
     loading: 'Loading checks…',

@@ -3,7 +3,11 @@ import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MENTOR_ROLE, RUN_STATUS } from '@/entities/game/index.ts'
 import type { MentorItem, MentorRole, RunStatus } from '@/entities/game/index.ts'
-import { CHAT_FOLLOW_THRESHOLD_PX, QUESTION_MAX_LENGTH } from '@/shared/config/index.ts'
+import {
+  CHAT_FEED_MAX_HEIGHT_PX,
+  QUESTION_MAX_LENGTH,
+  SWAP_SHORTCUT_LABEL,
+} from '@/shared/config/index.ts'
 import { Eyebrow } from '@/shared/ui/index.ts'
 
 const props = defineProps<{
@@ -16,6 +20,13 @@ const emit = defineEmits<{ ask: [question: string] }>()
 const { t } = useI18n()
 const question = ref('')
 const feedEl = ref<HTMLElement | null>(null)
+const inputEl = ref<HTMLInputElement | null>(null)
+
+// The page-level focus-swap shortcut drives these.
+defineExpose({
+  focus: (): void => inputEl.value?.focus(),
+  hasFocus: (): boolean => document.activeElement === inputEl.value,
+})
 
 const BUBBLE_CLASS: Record<MentorRole, string> = {
   [MENTOR_ROLE.mentor]: 'border border-line bg-surface-2 rounded-bl-[5px]',
@@ -35,18 +46,15 @@ function isMine(item: MentorItem): boolean {
   return item.role === MENTOR_ROLE.you || item.role === MENTOR_ROLE.youCmd
 }
 
-// Scroll ownership (fl-next pattern): follow the conversation only when the
-// reader is already near the bottom; never yank them up mid-read.
+// The newest message is ALWAYS kept in view (deliberate, over the near-bottom
+// pattern): the box has a fixed max height, and a mentor streaming below the
+// fold would otherwise go unseen mid-run.
 watch(
   () => props.feed.length + (props.feed[props.feed.length - 1]?.text.length ?? 0),
   async () => {
+    await nextTick()
     const el = feedEl.value
-    if (!el) return
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < CHAT_FOLLOW_THRESHOLD_PX
-    if (nearBottom) {
-      await nextTick()
-      el.scrollTop = el.scrollHeight
-    }
+    if (el) el.scrollTop = el.scrollHeight
   }
 )
 
@@ -59,15 +67,24 @@ function send(): void {
 </script>
 
 <template>
-  <div class="panel">
+  <div
+    class="panel transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-line))]"
+  >
     <Eyebrow>
       {{ t('chat.eyebrow') }}
       <span
         class="inline-block h-2 w-2 rounded-full"
         :class="busy ? 'bg-ok animate-pulse-dot motion-reduce:animate-none' : 'bg-faint'"
       ></span>
+      <kbd class="ml-auto normal-case tracking-normal" :title="t('shortcut.swap')">{{
+        SWAP_SHORTCUT_LABEL
+      }}</kbd>
     </Eyebrow>
-    <div ref="feedEl" class="grid max-h-[46vh] gap-2.5 overflow-y-auto px-0.5 py-1">
+    <div
+      ref="feedEl"
+      class="grid gap-2.5 overflow-y-auto px-0.5 py-1"
+      :style="{ maxHeight: `${CHAT_FEED_MAX_HEIGHT_PX}px` }"
+    >
       <p v-if="!feed.length" class="m-0 text-[13px] text-faint">{{ t('chat.idle') }}</p>
       <div v-for="(item, i) in feed" :key="i" class="flex" :class="{ 'justify-end': isMine(item) }">
         <div
@@ -81,6 +98,7 @@ function send(): void {
     </div>
     <form class="mt-3.5 flex gap-2" @submit.prevent="send">
       <input
+        ref="inputEl"
         v-model="question"
         class="flex-1 rounded-lg border border-line bg-bg-deep px-3 py-2 font-sans text-[13px] text-ink focus:border-accent focus:outline-none"
         type="text"

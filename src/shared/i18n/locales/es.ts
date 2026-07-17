@@ -112,6 +112,9 @@ export default {
     onError: 'Habla cuando provocas un error',
     note: 'El chat siempre te responde. Resolver (y la revelación al agotarse el tiempo) siempre habla.',
   },
+  shortcut: {
+    swap: 'Ctrl + la tecla sobre el Tab (º en teclado español) alterna el foco entre el terminal y el chat',
+  },
   verdict: {
     eyebrow: 'veredicto',
     loading: 'Cargando checks…',

@@ -14,9 +14,16 @@ export const SHELL_COMMANDS = [
   'git', 'ls', 'cat', 'rm', 'grep', 'find', 'echo', 'cd', 'pwd', 'head', 'tail', 'wc', 'clear',
 ] as const
 
-/** Chat follows new messages only when the reader is already near the bottom. */
-export const CHAT_FOLLOW_THRESHOLD_PX = 90
+/** The conversation box caps near the terminal frame height and scrolls
+ * inside; the newest message is always kept in view. */
+export const CHAT_FEED_MAX_HEIGHT_PX = 440
 export const QUESTION_MAX_LENGTH = 500
+
+/** Focus swap between terminal and chat: the physical key above Tab (` on
+ * ANSI, º on Spanish ISO). Chromium on ISO Macs swaps Backquote and
+ * IntlBackslash, so both codes mean that key somewhere. */
+export const SWAP_SHORTCUT_CODES: readonly string[] = ['Backquote', 'IntlBackslash']
+export const SWAP_SHORTCUT_LABEL = 'Ctrl+`'
 
 export const LEADERBOARD_MAX_ROWS = 12
 

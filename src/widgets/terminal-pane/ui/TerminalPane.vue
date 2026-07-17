@@ -3,7 +3,7 @@ import { WTerm } from '@wterm/dom'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { execCommand, livePrompt, onCommand, registerTerminalWriter, submit, tabCandidates } from '@/entities/game/index.ts'
-import { TERMINAL_COLS, TERMINAL_ROWS } from '@/shared/config/index.ts'
+import { SWAP_SHORTCUT_LABEL, TERMINAL_COLS, TERMINAL_ROWS } from '@/shared/config/index.ts'
 import { TermShell } from '@/shared/lib/bash-shell.ts'
 
 defineProps<{ pinned?: boolean }>()
@@ -12,6 +12,13 @@ defineEmits<{ 'toggle-pin': [] }>()
 const { t } = useI18n()
 const host = ref<HTMLElement | null>(null)
 let term: WTerm | null = null
+
+// The page-level focus-swap shortcut drives these. wterm's focusable input
+// lives inside the host, so containment answers "am I here".
+defineExpose({
+  focus: (): void => term?.focus(),
+  hasFocus: (): boolean => !!host.value && host.value.contains(document.activeElement),
+})
 
 onMounted(async () => {
   if (!host.value) return
@@ -41,7 +48,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-panel border border-line-strong bg-bg-deep shadow-[0_24px_60px_rgb(4_8_16_/_0.55)]">
+  <div
+    class="overflow-hidden rounded-panel border border-line-strong bg-bg-deep shadow-[0_24px_60px_rgb(4_8_16_/_0.55)] transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line-strong))]"
+  >
     <div class="flex items-center gap-2 border-b border-line px-3.5 py-2.5">
       <span class="h-[11px] w-[11px] rounded-full bg-[#ff5f57]"></span>
       <span class="h-[11px] w-[11px] rounded-full bg-[#febc2e]"></span>
@@ -50,6 +59,7 @@ onBeforeUnmount(() => {
       <i18n-t keypath="terminal.hint" tag="span" class="ml-auto font-mono text-[11px] text-faint">
         <template #enter><kbd>Enter</kbd></template>
       </i18n-t>
+      <kbd class="ml-2.5" :title="t('shortcut.swap')">{{ SWAP_SHORTCUT_LABEL }}</kbd>
       <button
         class="ml-2.5 cursor-pointer rounded-[7px] border bg-transparent px-[7px] py-1 text-xs leading-none transition-[opacity,border-color] duration-150"
         :class="
