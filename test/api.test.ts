@@ -262,4 +262,17 @@ describe('sharpen API', () => {
     expect(submit.body.nudged).toBe(true)
     expect(run.lastCommandErrored).toBe(false)
   })
+
+  // Deep links (a reload on /git/clean-sweep) must fall through to the SPA
+  // shell, not 404. Guards the fallback wiring; the dotfile-path variant of
+  // this bug is exercised by the release smoke test from a dot dir.
+  it('serves the SPA shell on a deep link, and still 404s unknown API routes', async () => {
+    const deep = await request(app).get('/git/clean-sweep')
+    expect(deep.status).toBe(200)
+    expect(deep.type).toBe('text/html')
+    expect(deep.text).toContain('<div id="app">')
+
+    const missingApi = await request(app).get('/api/does-not-exist')
+    expect(missingApi.status).toBe(404)
+  })
 })

@@ -396,6 +396,11 @@ app.post('/api/runs/:id/expire', async (req, res) => {
 // SPA fallback: deep links like /git/clean-sweep must serve the app shell.
 // express.static above already answered real files; anything else that is not
 // an API call falls through to index.html and the router takes over.
+// A relative path with an explicit `root` is mandatory, not stylistic: given
+// an absolute path, `send` walks every segment and its default dotfiles:
+// 'ignore' 404s any path crossing a dot dir. The launcher installs the app
+// under ~/.sharpen/app/<version>, so the absolute form silently broke every
+// deep link in the shipped artifact while dev (no dot segment) looked fine.
 app.get(/^\/(?!api\/).*/, (_req, res) => {
-  res.sendFile(join(root, 'dist', 'index.html'))
+  res.sendFile('index.html', { root: join(root, 'dist') })
 })

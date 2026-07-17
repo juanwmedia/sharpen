@@ -67,8 +67,12 @@ step('gates: npm run build (typecheck + vite)')
 sh('npm run build')
 
 // 4. Bundle. One plain-node file: no tsx, no node_modules on player machines.
+// The stage dir name starts with a dot on purpose: the launcher installs the
+// app under ~/.sharpen/app/<version>, so the smoke test must run the bundle
+// from a path with a dot segment to catch dotfile-path regressions (send's
+// default dotfiles:'ignore' 404s SPA deep links served by absolute path).
 step('bundling server.mjs')
-const stage = mkdtempSync(join(tmpdir(), 'sharpen-release-'))
+const stage = mkdtempSync(join(tmpdir(), '.sharpen-release-'))
 await build({
   entryPoints: [join(root, 'server/index.ts')],
   outfile: join(stage, 'server/server.mjs'),
@@ -147,6 +151,12 @@ async function smokeTest(stageDir) {
     const home = await fetch(`${base}/`)
     assert(home.ok, `GET / returned ${home.status}`)
     assert((home.headers.get('content-type') ?? '').includes('text/html'), 'GET / did not serve dist')
+
+    // Deep link: a reload on a scenario URL must fall through to the SPA
+    // shell. This is the case that broke in v0.1.5 from ~/.sharpen (dot dir).
+    const deep = await fetch(`${base}/${SMOKE_SCENARIO}`)
+    assert(deep.ok, `GET /${SMOKE_SCENARIO} (SPA deep link) returned ${deep.status}`)
+    assert((deep.headers.get('content-type') ?? '').includes('text/html'), 'deep link did not serve the SPA shell')
 
     const scenarios = await (await fetch(`${base}/api/scenarios`)).json()
     assert(
