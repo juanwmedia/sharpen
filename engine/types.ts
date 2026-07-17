@@ -17,6 +17,15 @@ export const RUN_MODES = ['learn', 'challenge'] as const
 export type RunMode = (typeof RUN_MODES)[number]
 export const DEFAULT_RUN_MODE: RunMode = 'learn'
 
+/** Which signals auto-wake the mentor after a failed validation. Part of the
+ * API contract: the web sends them in every submit body; what each signal
+ * MEANS is engine-defined (git: repo hash moved / command exited nonzero). */
+export interface NudgePrefs {
+  onChange: boolean
+  onError: boolean
+}
+export const DEFAULT_NUDGE_PREFS: NudgePrefs = { onChange: true, onError: true }
+
 /** Mentor bubble kind on mentor-delta SSE; omit for the default mentor style. */
 export const MENTOR_BUBBLE = {
   mentor: 'mentor',

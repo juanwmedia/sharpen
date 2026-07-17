@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { getChallengeByPackSlug } from '@challenges/index.ts'
 import { RUN_STATUS, registerRunLostHandler, useGame } from '@/entities/game/index.ts'
+import { MentorNudges } from '@/features/mentor-nudges/index.ts'
 import { BriefingModal, Chip } from '@/shared/ui/index.ts'
 import { LearnPanel } from '@/widgets/learn-panel/index.ts'
 import { MentorChat } from '@/widgets/mentor-chat/index.ts'
@@ -87,7 +88,6 @@ const terminalPinned = ref(true)
           <TerminalPane
             v-if="state.challenge"
             :key="state.runId ?? ''"
-            :challenge-title="state.challenge.title"
             :pinned="terminalPinned"
             @toggle-pin="terminalPinned = !terminalPinned"
           />
@@ -111,6 +111,7 @@ const terminalPinned = ref(true)
         @reveal="revealSolution"
         @wipe="wipeLearn"
       />
+      <MentorNudges />
       <VerdictPanel :checks="state.checks" />
     </aside>
 

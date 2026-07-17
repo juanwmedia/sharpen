@@ -4,10 +4,9 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { execCommand, livePrompt, onCommand, registerTerminalWriter, submit, tabCandidates } from '@/entities/game/index.ts'
 import { TERMINAL_COLS, TERMINAL_ROWS } from '@/shared/config/index.ts'
-import { ansi } from '@/shared/lib/ansi.ts'
 import { TermShell } from '@/shared/lib/bash-shell.ts'
 
-const props = defineProps<{ challengeTitle: string; pinned?: boolean }>()
+defineProps<{ pinned?: boolean }>()
 defineEmits<{ 'toggle-pin': [] }>()
 
 const { t } = useI18n()
@@ -28,7 +27,6 @@ onMounted(async () => {
     onSubmit: () => submit(),
     tabCandidates,
     prompt: livePrompt,
-    greeting: [`${ansi.brand('sharpen arena')} · ${props.challengeTitle}`, ansi.dim(t('terminal.greetingTagline')), ''],
   })
   term.onData = (data: string) => void shell.handleInput(data)
   shell.attach((data) => term?.write(data))

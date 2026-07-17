@@ -101,6 +101,9 @@ const LANGUAGE_RULES: Record<Locale, string> = {
 
 const MAX_QUEUE = 3
 
+/** claude's exact complaint when a --resume target no longer exists. */
+const NO_CONVERSATION_RE = /No conversation found with session ID/i
+
 // Structural view of the spawned claude process: everything the mentor
 // touches, and nothing more, so tests can substitute a fake child.
 export interface MentorChild {
@@ -262,8 +265,21 @@ export class Mentor {
     })
 
     child.on('close', (code) => {
-      if (code === 0) finish('done')
-      else finish(MENTOR_ERROR_KIND.failed, stderrTail || `claude exited with code ${code}`)
+      if (code === 0) return finish('done')
+      // Self-heal a vanished session (stale learn snapshot, cleaned ~/.claude,
+      // CLI upgrade): drop the dead id and replay the SAME prompt on a fresh
+      // session. Prompts are self-contained (board + transcript travel in
+      // every turn), so the only loss is conversational memory. A fresh
+      // --session-id turn cannot produce this error, so no retry loop.
+      if (this.busy && NO_CONVERSATION_RE.test(stderrTail)) {
+        clearTimeout(watchdog)
+        this.busy = false
+        this.turns -= 1
+        this.sessionId = null
+        this._run(prompt)
+        return
+      }
+      finish(MENTOR_ERROR_KIND.failed, stderrTail || `claude exited with code ${code}`)
     })
 
     child.stdin.write(prompt)

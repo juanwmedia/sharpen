@@ -34,6 +34,7 @@ import {
 } from '@/shared/config/index.ts'
 import { currentLocale, t } from '@/shared/i18n/index.ts'
 import { ansi, CRLF } from '@/shared/lib/ansi.ts'
+import { nudgePrefs } from './nudges.ts'
 import { MENTOR_ROLE, RUN_STATUS } from './types.ts'
 import type { GameState, MentorItem, MentorRole } from './types.ts'
 
@@ -89,7 +90,6 @@ let termWrite: (data: string) => void = () => {}
 // Navigation is the router's job (app layer): when the server forgets a run,
 // the arena page registers what "go home" means.
 let runLostHandler: () => void = () => {}
-let shellTipShown = false
 // Each mentor turn gets its own bubble; deltas within a turn append.
 let mentorNewTurn = true
 /** Role for the mentor turn currently streaming (set from the first delta). */
@@ -235,7 +235,6 @@ function resetClientRunFields(): void {
   events?.close()
   events = null
   arena = null
-  shellTipShown = false
   state.runId = null
   state.branch = ARENA_DEFAULT_BRANCH
   state.checks = null
@@ -382,20 +381,24 @@ export async function execCommand(command: string): Promise<ExecResult> {
   return result
 }
 
+let pendingCommandBubble: MentorItem | null = null
+
+function flushCommandBubble(): void {
+  if (!pendingCommandBubble) return
+  state.mentorFeed.push(pendingCommandBubble)
+  pendingCommandBubble = null
+}
+
 // Runs AFTER the shell flushed the command output. Core mechanic: EVERY Enter
 // validates, so the arena judges the state each command leaves behind.
 export async function onCommand(command: string, result: ExecResult): Promise<void> {
-  // The mentor's creator tried to greet it right here in the shell, so this
-  // tip is not optional: humans WILL talk to the terminal.
-  if (result.stderr.includes('command not found') && !shellTipShown) {
-    shellTipShown = true
-    termWrite(ansi.dim(t('terminal.shellTip')) + CRLF)
-  }
-  // Every command joins the conversation as a player bubble: the chat is the
-  // narrative of the run, the terminal keeps the full output.
-  const firstErrLine = result.exitCode !== 0 ? (result.stderr.split('\n')[0] ?? '') : ''
-  state.mentorFeed.push({ role: MENTOR_ROLE.youCmd, text: command, ...(firstErrLine ? { meta: firstErrLine } : {}) })
   if (state.status !== RUN_STATUS.live) return
+  // The command bubble waits for the server's nudge decision: an Enter that
+  // wakes nobody (ls, git status, empty) does not belong in the conversation.
+  // Flushed by whoever learns the decision first: the submit response or the
+  // mentor-thinking SSE frame (they race).
+  const firstErrLine = result.exitCode !== 0 ? (result.stderr.split('\n')[0] ?? '') : ''
+  pendingCommandBubble = { role: MENTOR_ROLE.youCmd, text: command, ...(firstErrLine ? { meta: firstErrLine } : {}) }
   const output = (result.stdout + result.stderr).slice(0, COMMAND_OUTPUT_MAX_CHARS)
   if (state.mode === 'learn') {
     learnTranscript.push({ command, output })
@@ -403,7 +406,7 @@ export async function onCommand(command: string, result: ExecResult): Promise<vo
   await fetch(apiRoutes.runCommand(state.runId ?? ''), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ command, output }),
+    body: JSON.stringify({ command, output, error: result.exitCode !== 0 }),
   }).catch(() => {})
   await submit({ quiet: true })
   scheduleLearnSave()
@@ -419,10 +422,19 @@ export async function submit({ quiet = false }: { quiet?: boolean } = {}): Promi
     return
   }
   if (state.status !== RUN_STATUS.live || !state.runId) return
-  const res = await fetch(apiRoutes.runSubmit(state.runId), { method: 'POST' })
-  if (!res.ok) return
-  const verdict = (await res.json()) as { pass: boolean; checks: Check[] }
+  const res = await fetch(apiRoutes.runSubmit(state.runId), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nudges: { ...nudgePrefs } }),
+  })
+  if (!res.ok) {
+    pendingCommandBubble = null
+    return
+  }
+  const verdict = (await res.json()) as { pass: boolean; checks: Check[]; nudged?: boolean }
   state.checks = verdict.checks
+  if (verdict.nudged) flushCommandBubble()
+  else pendingCommandBubble = null
   if (verdict.pass) {
     state.status = RUN_STATUS.passed
     termWrite(ansi.green(t('terminal.solved')) + CRLF)
@@ -535,6 +547,9 @@ function connectEvents(runId: string): void {
   })
   events.addEventListener(ARENA_EVENT.mentorThinking, () => {
     state.mentorBusy = true
+    // The SSE frame can beat the submit response: land the command bubble
+    // before the thinking indicator so the conversation reads in order.
+    flushCommandBubble()
     if (!state.mentorFeed.some((m) => m.role === MENTOR_ROLE.thinking)) {
       state.mentorFeed.push({ role: MENTOR_ROLE.thinking, text: t('chat.thinking') })
     }

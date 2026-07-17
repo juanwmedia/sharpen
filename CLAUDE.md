@@ -51,6 +51,23 @@ skills/       The Claude Code plugin skill that boots the arena.
   MAX_QUEUE 3, hints coalesce. Socratic guardrail lives in the prompts: while
   LIVE it never names the solving command; after timeout it reveals and
   teaches. Tests set `SHARPEN_NO_MENTOR=1` and inject `spawnFn`.
+- **Nudge gate.** A failed validation only asks the mentor when the Enter
+  left a trace: `verdict.stateHash` delta, a check flip, or a command error
+  (`server/nudge.ts`; baseline seeded on start). Empty Enters and read-only
+  commands (ls, git status...) stay silent BY STATE, never by parsing the
+  typed command. Both signals are player-switchable (MentorNudges panel in
+  the arena sidebar, localStorage-persisted, default ON; prefs travel in the
+  submit body, absent body = both on). The signals are ENGINE-DEFINED: every
+  future engine must say what "state moved" and "your attempt errored" mean
+  for its artifact (TS: diagnostics; SQL: query errors). For bash/git, error
+  means any command that exited nonzero, typos included: with the switches
+  in the player's hands, no hidden filtering on top of them (a toggle that
+  says "speaks on errors" must speak on every error). Chat, pass, reveal
+  and timeout turns are ungated. The error flag in POST /command is UX
+  signal only: it must never feed scoring or evidence. The submit response
+  carries `nudged` and the web
+  paints the command bubble in the conversation only when it is true: one
+  decision drives both the mentor and the chat narrative.
 
 ## i18n rules
 

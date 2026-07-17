@@ -12,7 +12,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'sharpen-api-test-'))
 process.env.SHARPEN_DATA_DIR = dataDir
 process.env.SHARPEN_NO_MENTOR = '1'
 
-const { app } = await import('../server/app.ts')
+const { app, runs } = await import('../server/app.ts')
 
 async function createRun(mode?: 'learn' | 'challenge'): Promise<string> {
   const res = await request(app)
@@ -212,5 +212,53 @@ describe('sharpen API', () => {
     const submit = await request(app).post(`/api/runs/${runId}/submit`)
     expect(submit.status).toBe(200)
     expect(submit.body.pass).toBe(true)
+  })
+
+  it('seeds the nudge baseline on start and rolls it forward on submit', async () => {
+    const runId = await createRun('challenge')
+    await request(app).post(`/api/runs/${runId}/start`)
+    const run = runs.get(runId)!
+    expect(run.nudgeBaseline).not.toBeNull()
+    const seeded = run.nudgeBaseline!
+
+    // Empty Enter: state untouched, no nudge, baseline stays byte-identical.
+    const quiet = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(quiet.body.nudged).toBe(false)
+    expect(run.nudgeBaseline).toEqual(seeded)
+
+    // A state-changing command nudges and moves the baseline with the new hash.
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'rm build.log', output: '', error: false })
+    const loud = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(loud.body.nudged).toBe(true)
+    expect(run.nudgeBaseline!.stateHash).not.toBe(seeded.stateHash)
+  })
+
+  it('honors the nudge switches sent with submit', async () => {
+    const runId = await createRun('challenge')
+    await request(app).post(`/api/runs/${runId}/start`)
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'rm build.log', output: '', error: false })
+    const res = await request(app)
+      .post(`/api/runs/${runId}/submit`)
+      .send({ nudges: { onChange: false, onError: false } })
+    // The state moved, but the player muted both signals.
+    expect(res.body.nudged).toBe(false)
+  })
+
+  it('records and clears the command error flag around submit', async () => {
+    const runId = await createRun('challenge')
+    await request(app).post(`/api/runs/${runId}/start`)
+    const run = runs.get(runId)!
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'git clean', output: 'fatal: refusing to clean', error: true })
+    expect(run.lastCommandErrored).toBe(true)
+    // The refused command changed nothing, but the error makes it a nudge.
+    const submit = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(submit.body.nudged).toBe(true)
+    expect(run.lastCommandErrored).toBe(false)
   })
 })

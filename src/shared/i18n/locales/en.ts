@@ -57,8 +57,6 @@ export default {
     hint: 'every {enter} validates',
     pin: 'Pin terminal (stays visible)',
     unpin: 'Unpin terminal (scrolls with the page)',
-    greetingTagline: 'The repo is real. Every Enter validates.',
-    shellTip: 'That is the shell, not the mentor. Ask the mentor in the conversation below; every Enter validates your repo state.',
     solved: '✓ Scenario solved. The arena validated your repo state.',
     notYetQuiet: '✗ not yet: {green}/{total} checks green',
     notYetLoud: '✗ Not yet. Check the verdict panel. The mentor has a hint.',
@@ -110,6 +108,12 @@ export default {
     body: 'This clears your saved commands and mentor conversation for this scenario. Challenge mode is unaffected.',
     confirm: 'Wipe and restart',
     cancel: 'Keep progress',
+  },
+  mentorNudges: {
+    eyebrow: 'mentor',
+    onChange: 'Speaks when the state changes',
+    onError: 'Speaks when you hit an error',
+    note: 'The chat always answers you. Solving (and the timeout reveal) always speaks.',
   },
   verdict: {
     eyebrow: 'verdict',

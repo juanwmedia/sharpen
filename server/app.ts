@@ -8,12 +8,14 @@ import { formatBoard } from '../engine/board.ts'
 import {
   ARENA_EVENT,
   DEFAULT_LOCALE,
+  DEFAULT_NUDGE_PREFS,
   DEFAULT_RUN_MODE,
   LOCALES,
   MENTOR_BUBBLE,
   RUN_MODES,
   type Check,
   type MentorBubble,
+  type NudgePrefs,
   type Snapshot,
 } from '../engine/types.ts'
 import {
@@ -32,6 +34,7 @@ import {
   type MentorHowClosed,
   type MentorTrigger,
 } from './mentor.ts'
+import { baselineOf, shouldNudge } from './nudge.ts'
 import { RUN_STATUS, RunStore, type Run, type TranscriptEntry } from './runs.ts'
 import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
 
@@ -231,14 +234,21 @@ app.get('/api/runs/:id/events', (req, res) => {
   runs.addClient(run, res)
 })
 
-app.post('/api/runs/:id/start', (req, res) => {
+app.post('/api/runs/:id/start', async (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'unknown run' })
+  const wasReady = run.status === RUN_STATUS.ready
   runs.start(run, (timedOut) => {
     slog(`run=${timedOut.id} timeout`)
     runs.emit(timedOut, ARENA_EVENT.timeout, {})
     void mentorFromInspect(timedOut, MENTOR_TRIGGER.timeout, { bubble: MENTOR_BUBBLE.reveal })
   })
+  if (wasReady) {
+    // Seed the nudge gate with the opening board (or the restored transcript
+    // in learn) so a first read-only Enter stays silent.
+    const { verdict } = await runs.inspect(run)
+    run.nudgeBaseline = baselineOf(verdict)
+  }
   slog(`run=${run.id} started player=${run.player} challenge=${run.challengeId} mode=${run.mode}`)
   res.json({ startedAt: run.startedAt, deadline: run.deadline, mode: run.mode, status: run.status })
 })
@@ -286,9 +296,21 @@ app.post('/api/runs/:id/command', (req, res) => {
   if (!run) return res.status(404).json({ error: 'unknown run' })
   if (run.status === RUN_STATUS.live && typeof req.body?.command === 'string') {
     runs.recordCommand(run, req.body.command, req.body.output)
+    // UX signal only (never affects scoring): feeds the error switch of the
+    // nudge gate on the next submit.
+    run.lastCommandErrored = req.body.error === true
   }
   res.status(204).end()
 })
+
+/** The player's nudge switches travel in each submit; absent body = both on. */
+function nudgePrefsFrom(body: unknown): NudgePrefs {
+  const prefs = (body as { nudges?: Partial<NudgePrefs> } | undefined)?.nudges
+  return {
+    onChange: prefs?.onChange ?? DEFAULT_NUDGE_PREFS.onChange,
+    onError: prefs?.onError ?? DEFAULT_NUDGE_PREFS.onError,
+  }
+}
 
 app.post('/api/runs/:id/submit', async (req, res) => {
   const run = runs.get(req.params.id)
@@ -298,6 +320,9 @@ app.post('/api/runs/:id/submit', async (req, res) => {
   const { snapshot, verdict } = await runs.submit(run)
   runs.emit(run, ARENA_EVENT.verdict, { pass: verdict.pass, checks: verdict.checks, attempts: run.attempts })
 
+  // Policy outcome, not ask acceptance: the web uses it to decide whether the
+  // command deserves a bubble in the conversation (same gate, one decision).
+  let nudged = true
   if (verdict.pass) {
     if (run.mode === 'challenge') {
       const evidence = await saveEvidence(run, verdict)
@@ -313,15 +338,20 @@ app.post('/api/runs/:id/submit', async (req, res) => {
         durationSec,
       })
     )
-  } else {
+  } else if (shouldNudge(run.nudgeBaseline, verdict, run.lastCommandErrored, nudgePrefsFrom(req.body))) {
     askMentor(
       run,
       mentorPromptFor(run, MENTOR_TRIGGER.submitFail, { snapshot, checks: verdict.checks }),
       { coalesce: true }
     )
+  } else {
+    nudged = false
+    slog(`run=${run.id} nudge gated: no state delta`)
   }
+  run.nudgeBaseline = baselineOf(verdict)
+  run.lastCommandErrored = false
   slog(`run=${run.id} submit attempt=${run.attempts} pass=${verdict.pass}`)
-  res.json({ pass: verdict.pass, checks: verdict.checks })
+  res.json({ pass: verdict.pass, checks: verdict.checks, nudged })
 })
 
 // Chat: same Open/Closed context as other turns; trigger is chat.

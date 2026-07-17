@@ -17,6 +17,7 @@ import {
 } from '../engine/types.ts'
 import type { Mentor } from './mentor.ts'
 import type { LearnStatus } from './learn.ts'
+import type { NudgeBaseline } from './nudge.ts'
 
 const HEARTBEAT_MS = 15_000
 const RUN_ID_CHARS = 8
@@ -60,6 +61,10 @@ export interface Run {
   mentorTurns: number
   /** Applied in start() after going live (learn restore of a finished run). */
   restoredStatus: LearnStatus | null
+  /** Previous validated state; gates submitFail nudges (see nudge.ts). */
+  nudgeBaseline: NudgeBaseline | null
+  /** Last transcript command ended in error (client-reported exit code). */
+  lastCommandErrored: boolean
 }
 
 // In-memory run registry. One run = one attempt at one challenge by the local
@@ -102,6 +107,8 @@ export class RunStore {
       mentorSessionId: null,
       mentorTurns: 0,
       restoredStatus: null,
+      nudgeBaseline: null,
+      lastCommandErrored: false,
     }
     this.runs.set(run.id, run)
     return run

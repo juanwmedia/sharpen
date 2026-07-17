@@ -105,6 +105,49 @@ describe('Mentor queue', () => {
     expect(mentor.turns).toBe(4)
   })
 
+  it('self-heals a vanished session: retries the same prompt on a fresh session', async () => {
+    const children: Array<FakeChild & { args?: string[] }> = []
+    const spawnFn: SpawnFn = (_cmd, args) => {
+      const child = new FakeChild() as FakeChild & { args?: string[] }
+      child.args = args
+      children.push(child)
+      return child
+    }
+    const onDone = vi.fn()
+    const onError = vi.fn()
+    const mentor = new Mentor({
+      onDelta: vi.fn(),
+      onDone,
+      onError,
+      spawnFn,
+      sessionId: 'gone-session',
+      turns: 3,
+    })
+
+    mentor.ask('nudge me')
+    expect(children).toHaveLength(1)
+    expect(children[0]!.args).toContain('--resume')
+
+    // claude cannot find the session: the exact failure a stale learn
+    // snapshot (or a cleaned ~/.claude) produces.
+    children[0]!.stderr.write('No conversation found with session ID: gone-session')
+    await tick()
+    await complete(children[0]!, { code: 1 })
+
+    // The mentor dropped the dead id and replayed the SAME prompt fresh.
+    expect(children).toHaveLength(2)
+    expect(children[1]!.args).toContain('--session-id')
+    expect(children[1]!.args).not.toContain('gone-session')
+    expect(children[1]!.stdinData).toBe('nudge me')
+
+    await complete(children[1]!)
+    expect(onDone).toHaveBeenCalledTimes(1)
+    expect(onError).not.toHaveBeenCalled()
+    expect(mentor.sessionId).not.toBe('gone-session')
+    // The healed turn counts once, not twice.
+    expect(mentor.turns).toBe(4)
+  })
+
   it('drains three rapid asks serially, in order', async () => {
     const { mentor, children, onDone } = harness()
 

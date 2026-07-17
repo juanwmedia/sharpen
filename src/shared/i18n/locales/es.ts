@@ -55,8 +55,6 @@ export default {
     hint: 'cada {enter} valida',
     pin: 'Fijar el terminal (siempre visible)',
     unpin: 'Soltar el terminal (se desplaza con la página)',
-    greetingTagline: 'El repo es real. Cada Enter valida.',
-    shellTip: 'Esto es la shell, no el mentor. Pregunta al mentor en la conversación de abajo; cada Enter valida el estado de tu repo.',
     solved: '✓ Escenario resuelto. La arena validó el estado de tu repo.',
     notYetQuiet: '✗ todavía no: {green}/{total} checks en verde',
     notYetLoud: '✗ Todavía no. Mira el panel de veredicto. El mentor tiene una pista.',
@@ -108,6 +106,12 @@ export default {
     body: 'Esto limpia los comandos y la conversación del mentor guardados para este escenario. El modo desafío no se ve afectado.',
     confirm: 'Borrar y reiniciar',
     cancel: 'Conservar progreso',
+  },
+  mentorNudges: {
+    eyebrow: 'mentor',
+    onChange: 'Habla cuando el estado cambia',
+    onError: 'Habla cuando provocas un error',
+    note: 'El chat siempre te responde. Resolver (y la revelación al agotarse el tiempo) siempre habla.',
   },
   verdict: {
     eyebrow: 'veredicto',

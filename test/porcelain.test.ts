@@ -19,6 +19,13 @@ describe('git porcelain', () => {
     expect(r.exitCode).toBe(0)
   })
 
+  it('unknown commands exit 127 with a bash-style message, like a real shell', async () => {
+    const arena = await freshArena()
+    const r = await arena.exec('yo')
+    expect(r.exitCode).toBe(127)
+    expect(r.stderr).toContain('command not found')
+  })
+
   it('refuses git clean without -f or -n, like real git', async () => {
     const arena = await freshArena()
     const r = await arena.exec('git clean')
