@@ -39,6 +39,9 @@ onMounted(() => void boot())
     <div class="flex items-center gap-2">
       <Chip v-if="state.player" class="pl-[5px]"><PlayerLink :player="state.player" /></Chip>
       <Chip tone="dim">{{ t('app.engine', { version: state.engineVersion }) }}</Chip>
+      <Chip v-if="state.updateAvailable" tone="accent" :title="t('app.updateHint')">
+        {{ t('app.updateAvailable', { version: state.updateAvailable }) }}
+      </Chip>
       <RunModeSwitch />
       <LanguageSwitch />
     </div>

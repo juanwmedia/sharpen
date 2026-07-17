@@ -38,6 +38,7 @@ import {
 import { baselineOf, shouldNudge } from './nudge.ts'
 import { RUN_STATUS, RunStore, type Run, type TranscriptEntry } from './runs.ts'
 import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
+import { checkForUpdate } from './update-check.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -178,8 +179,15 @@ function mentorFromInspect(
   )
 }
 
+// One check per server lifetime; every /api/meta awaits the same promise.
+const updateAvailable = checkForUpdate(ENGINE_VERSION)
+
 app.get('/api/meta', async (_req, res) => {
-  res.json({ engineVersion: ENGINE_VERSION, player: await defaultPlayer() })
+  res.json({
+    engineVersion: ENGINE_VERSION,
+    player: await defaultPlayer(),
+    updateAvailable: await updateAvailable,
+  })
 })
 
 app.get('/api/scenarios', (_req, res) => {

@@ -155,6 +155,21 @@ interface StreamEvent {
   result?: unknown
 }
 
+/** Human messages for the ways spawning claude fails per platform. */
+function spawnErrorDetail(err: NodeJS.ErrnoException): string {
+  if (err.code === 'ENOENT') {
+    return 'claude CLI not found on PATH. Install and authenticate Claude Code to enable the mentor.'
+  }
+  // Node refuses to spawn .cmd shims without a shell, and the npm-installed
+  // claude on Windows is one. The native installer ships claude.exe, which
+  // spawns fine, so point the player there instead of papering over it with
+  // cmd.exe quoting (the multiline system prompt would not survive it).
+  if (err.code === 'EINVAL' && process.platform === 'win32') {
+    return 'claude could not be spawned: on Windows the mentor needs the native Claude Code installer (claude.exe), not the npm shim.'
+  }
+  return String(err.message)
+}
+
 export class Mentor {
   onDelta: (text: string, bubble: MentorBubble) => void
   onDone: () => void
@@ -240,7 +255,10 @@ export class Mentor {
       child = this.spawnFn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (err) {
       this.busy = false
-      this.onError(MENTOR_ERROR_KIND.unavailable, String(err instanceof Error ? err.message : err))
+      this.onError(
+        MENTOR_ERROR_KIND.unavailable,
+        err instanceof Error ? spawnErrorDetail(err as NodeJS.ErrnoException) : String(err)
+      )
       // Drain anyway: a stuck queue would let later asks jump ahead of it.
       this._drainNext()
       return
@@ -263,10 +281,7 @@ export class Mentor {
     }
 
     child.on('error', (err) => {
-      const detail = err.code === 'ENOENT'
-        ? 'claude CLI not found on PATH. Install and authenticate Claude Code to enable the mentor.'
-        : String(err.message)
-      finish(MENTOR_ERROR_KIND.unavailable, detail)
+      finish(MENTOR_ERROR_KIND.unavailable, spawnErrorDetail(err))
     })
 
     child.stderr.on('data', (chunk) => {

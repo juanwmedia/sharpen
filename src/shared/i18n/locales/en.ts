@@ -5,6 +5,8 @@ export default {
   app: {
     engine: 'engine {version}',
     byline: 'by FrontendLeap',
+    updateAvailable: 'v{version} available',
+    updateHint: 'A newer sharpen is out. Update the plugin from your AI harness (Claude Code: /plugin update sharpen).',
   },
   lang: {
     label: 'Language',

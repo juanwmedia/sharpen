@@ -34,6 +34,8 @@ export interface MentorItem {
 export interface GameState {
   player: string
   engineVersion: string
+  /** Newer published version, when the server's boot check found one. */
+  updateAvailable: string | null
   scenarios: ScenarioSummary[]
   /** Preferred mode for the next run; persisted in localStorage. */
   mode: RunMode

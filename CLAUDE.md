@@ -172,9 +172,23 @@ vocabulary, boilerplate, checklist). Canonical example:
   and `SHARPEN_DATA_DIR` override defaults (tests use a temp data dir).
 - Every release bumps `version` in `.claude-plugin/plugin.json` (keep
   `package.json` in sync): `/plugin update` only refreshes installed copies
-  when the version changes. `dist/` stays out of git on purpose; the launch
-  skill builds it on the player's machine, so `tsx` and everything `npm
-  start` touches must live in `dependencies`, never `devDependencies`.
+  when the version changes. Releasing IS publishing an artifact:
+  `npm run release` (scripts/release.mjs) refuses a dirty tree, failing
+  gates, an existing tag or an unpushed HEAD; bundles the server with
+  esbuild into a single `server.mjs`; smoke-boots that bundle and solves
+  clean-sweep through the API; then publishes `sharpen-v<version>.tar.gz` +
+  `.sha256` via `gh release create`. The artifact mirrors the repo layout
+  (`package.json`, `server/server.mjs`, `dist/`) so path resolution needs no
+  special cases (ENGINE_VERSION reads `../package.json` at runtime). The
+  launch skill downloads the exact-version asset to
+  `~/.sharpen/app/<version>` with checksum verification and falls back to
+  building from source, so `dist/` stays out of git and `tsx` plus runtime
+  deps stay in `dependencies`, never `devDependencies`. After each release,
+  update `https://frontendleap.com/sharpen/version.json` (`{"latest": "x.y.z"}`,
+  lives in the fl-next repo): the server checks it once per boot
+  (`server/update-check.ts`, `SHARPEN_NO_UPDATE_CHECK=1` and VITEST skip it)
+  and `/api/meta.updateAvailable` paints the update chip; the skill does the
+  same check and suggests `/plugin update sharpen`.
 - Browser verification happens in isolated contexts (chrome-devtools
   `isolatedContext`), never in the user's tab. If a verification run records
   a result, remove its entry from `~/.sharpen/leaderboard.json` and its file

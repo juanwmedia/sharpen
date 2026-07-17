@@ -1,6 +1,6 @@
 {
   "name": "sharpen",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Sharpen by FrontendLeap. Timed Git challenges in your browser, with a Socratic AI mentor. A Claude Code plugin.",
   "type": "module",
   "private": true,
@@ -9,6 +9,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "start": "tsx --import ./scenarios/package/register-md.ts server/index.ts",
     "test": "vitest run",
+    "release": "node scripts/release.mjs",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@wterm/core": "^0.3.0",
     "@wterm/dom": "^0.3.0",
     "@wterm/just-bash": "^0.3.0",
+    "esbuild": "^0.28.1",
     "supertest": "^7.2.2",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.9.3",

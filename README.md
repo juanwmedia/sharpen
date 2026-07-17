@@ -16,9 +16,10 @@
 /plugin install sharpen@sharpen
 ```
 
-Then run `/sharpen` in any Claude Code session. The first boot installs
-dependencies and builds the arena (about 2 minutes, the skill handles it);
-after that it just starts a local server and opens the arena in your browser.
+Then run `/sharpen` in any Claude Code session. The first boot downloads the
+prebuilt arena for your plugin version (a few MB, seconds; it builds from
+source only if the download is not possible); after that it just starts a
+local server and opens the arena in your browser.
 Each scenario has its own URL (`/git/clean-sweep`), so you can deep-link
 straight into a run.
 
@@ -119,7 +120,15 @@ npm run start      # the arena server on http://127.0.0.1:4517
 npm run build      # typecheck (vue-tsc) + production build to dist/
 npm test           # vitest: porcelain, verdicts, fs bridge, mentor queue, API, i18n, slugs
 npm run typecheck  # vue-tsc --noEmit
+npm run release    # gate, bundle, smoke-test and publish a GitHub Release
 ```
+
+Releases are prebuilt artifacts: `npm run release` refuses a dirty tree,
+failing gates or an existing tag, bundles the server into a single
+`server.mjs`, boots that bundle and solves a scenario through the API, and
+only then publishes `sharpen-v<version>.tar.gz` (plus checksum) to a GitHub
+Release. The launch skill downloads exactly the artifact matching the
+installed plugin version.
 
 To add a scenario: create a package folder `scenarios/<pack>/<name>/` with
 `scenario.md` (schema 2 frontmatter + bilingual sections), `scenario.yaml`

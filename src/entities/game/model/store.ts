@@ -68,6 +68,7 @@ function storedRunMode(): RunMode {
 const state = reactive<GameState>({
   player: '',
   engineVersion: '',
+  updateAvailable: null,
   scenarios: [],
   mode: storedRunMode(),
   scenario: null,
@@ -161,9 +162,12 @@ function setRunMode(mode: RunMode): void {
 }
 
 async function boot(): Promise<void> {
-  const meta = await getJson<{ player: string; engineVersion: string }>(apiRoutes.meta)
+  const meta = await getJson<{ player: string; engineVersion: string; updateAvailable?: string | null }>(
+    apiRoutes.meta
+  )
   state.player = meta.player
   state.engineVersion = meta.engineVersion
+  state.updateAvailable = meta.updateAvailable ?? null
   state.scenarios = await getJson<ScenarioSummary[]>(apiRoutes.scenarios)
 }
 

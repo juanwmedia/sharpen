@@ -1,10 +1,11 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ tone?: 'default' | 'dim' | 'ink' }>(), { tone: 'default' })
+withDefaults(defineProps<{ tone?: 'default' | 'dim' | 'ink' | 'accent' }>(), { tone: 'default' })
 
 const TONE_CLASS = {
   default: 'text-muted',
   dim: 'text-faint',
   ink: 'text-ink',
+  accent: 'text-accent',
 } as const
 </script>
 
