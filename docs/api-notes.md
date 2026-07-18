@@ -50,6 +50,16 @@ dependency upgrades.
   git's carry-uncommitted-changes semantics, so branch switching is
   hand-written in `engine/porcelain/git-command.ts` (switchBranch): symbolic
   HEAD move + per-path apply/refuse. Never switch branches via checkout().
+- Real `git restore` has `--staged`, not `--cached` (LC_ALL=C, 2026-07-18):
+  `git restore --cached .env` exits 129 with `error: unknown option
+  \`cached'`. `--cached` is valid on `diff`/`rm` only. Porcelain must refuse
+  the flag the same way; silently ignoring it used to fall through to a
+  worktree restore and a misleading pathspec error on staged-new files.
+- Same class of silent-lie bugs, also verified LC_ALL=C 2026-07-18:
+  `git commit -am` / `git commit -m` with no message value exit 129
+  (`error: switch \`m' requires a value`); never treat `-am` as the message.
+  `git add --cached`, `git status --cached`, `git switch --cached`, and
+  `git checkout --cached` all exit 129 with `unknown option \`cached'`.
 - Still absent: reflog for general refs (only stash keeps its own entry
   list) and all rebase machinery. reset/revert/reflog porcelain stays
   hand-written over `writeRef`/`resetIndex`/`readCommit`/`walk`.
@@ -82,3 +92,8 @@ dependency upgrades.
   making the mentor text-only), `--output-format stream-json
   --include-partial-messages` for streaming, `--append-system-prompt`.
 - Prompt goes via stdin to avoid argv size limits.
+- Hang policy (server/mentor.ts): 30s with no text delta kills ONLY the
+  spawned child via `child.kill` (Node terminates that PID on Windows too;
+  never `pkill claude`). Non-text stream lines do not reset the clock. One
+  silent retry on a fresh session, then `mentor-error`. Partial text keeps
+  the reply instead of retrying.

@@ -11,16 +11,17 @@ import type { Scenario, ScenarioSummary } from '../engine/types.ts'
 // Single registry consumed by the web bundle (setup + local execution) and the
 // server (authoritative replay validation). Order defines display order and is
 // curated easy to hard: concept progression, not alphabet.
-// The two restore-family scenarios (vanished file, abort experiment) are
-// deliberately non-adjacent: same command, different situation, spaced reps.
+// Restore-family scenarios (vanished file, abort experiment) stay non-adjacent:
+// same family, different situation, spaced reps. Clean sweep sits mid-pack so
+// the finale is the two-layer pathspec undo (half-deleted), not a one-liner.
 export const scenarios: Scenario[] = [
   theVanishedFile,
   leakedSecret,
   shipOnlyTheFix,
+  cleanSweep,
   wrongBranchWetPaint,
   abortTheExperiment,
   halfDeleted,
-  cleanSweep,
 ]
 
 export function getScenario(id: string): Scenario | undefined {

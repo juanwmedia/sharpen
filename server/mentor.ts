@@ -20,7 +20,14 @@ import {
 // Claude subscription, so capping it protects nobody and bricks learn runs.
 
 const MODEL = process.env.SHARPEN_MENTOR_MODEL ?? 'sonnet'
-const INACTIVITY_MS = 90_000
+/** Wall time with no mentor text before we kill the spawned child and retry.
+ * Measured on text deltas only: stream keepalives must not reset the clock
+ * (that is how a hung API left the UI on "thinking" for minutes). */
+export const MENTOR_TURN_TIMEOUT_MS = 30_000
+/** One silent retry after a text-timeout kill; then surface an error. */
+const MENTOR_TIMEOUT_RETRIES = 1
+/** After SIGTERM, escalate so a wedged child cannot hold the busy slot. */
+const MENTOR_KILL_GRACE_MS = 2_000
 
 export const MENTOR_PHASE = {
   open: 'open',
@@ -76,8 +83,14 @@ Hard rules:
   player to describe their working tree or restate that board. Nudge from it
   with one pointed question or observation. 1-3 sentences, max.
 - When the user message says ${MENTOR_PROMPT.closed}, you may teach and use the walkthrough.
-  If ${MENTOR_PROMPT.howClosedKey} is ${MENTOR_HOW_CLOSED.passed}, congratulate briefly then help. If ${MENTOR_HOW_CLOSED.revealed}, teach
-  the canonical approach and connect it to what they tried.
+  If ${MENTOR_PROMPT.howClosedKey} is ${MENTOR_HOW_CLOSED.passed}, congratulate briefly, name the
+  one concept the scenario was about, then (only if the transcript is clearly longer, less
+  idiomatic, or more fragile than the walkthrough) offer ONE short craft opportunity: a more
+  direct, simple, or pragmatic path. Frame it as optional craft, never as a grade or wrong
+  answer. If their path already matches the walkthrough or an equally tight equivalent, skip
+  the opportunity. Then offer to answer questions. Same ritual in every run mode.
+  If ${MENTOR_PROMPT.howClosedKey} is ${MENTOR_HOW_CLOSED.revealed}, teach the canonical
+  approach and connect it to what they tried.
 - Plain text only: no markdown headers, no bullet lists, no code fences. Short
   inline commands in backticks are fine.
 - Never use em dashes or en dashes; use commas, parentheses, or separate
@@ -131,6 +144,8 @@ export type MentorPromptSource = string | (() => string | Promise<string>)
 interface QueuedAsk {
   source: MentorPromptSource
   bubble: MentorBubble
+  /** Prior text-timeout kills for this logical turn (0 on first attempt). */
+  timeoutRetries?: number
 }
 
 /** claude's exact complaint when a --resume target no longer exists. */
@@ -166,6 +181,8 @@ export interface MentorOptions {
   sessionId?: string | null
   /** Turns already consumed in a restored session. */
   turns?: number
+  /** Override MENTOR_TURN_TIMEOUT_MS (tests). */
+  turnTimeoutMs?: number
 }
 
 interface StreamEvent {
@@ -195,12 +212,22 @@ export class Mentor {
   onError: (kind: MentorErrorKind, detail: string) => void
   spawnFn: SpawnFn
   locale: Locale
+  turnTimeoutMs: number
   sessionId: string | null = null
   turns = 0
   busy = false
   queue: QueuedAsk[] = []
 
-  constructor({ onDelta, onDone, onError, spawnFn, locale, sessionId, turns }: MentorOptions) {
+  constructor({
+    onDelta,
+    onDone,
+    onError,
+    spawnFn,
+    locale,
+    sessionId,
+    turns,
+    turnTimeoutMs,
+  }: MentorOptions) {
     this.onDelta = onDelta
     this.onDone = onDone
     this.onError = onError
@@ -208,6 +235,7 @@ export class Mentor {
     this.locale = locale ?? DEFAULT_LOCALE
     this.sessionId = sessionId ?? null
     this.turns = turns ?? 0
+    this.turnTimeoutMs = turnTimeoutMs ?? MENTOR_TURN_TIMEOUT_MS
   }
 
   // Never drop a request silently: spawning a turn takes seconds, so player
@@ -236,7 +264,7 @@ export class Mentor {
     if (next) void this._run(next)
   }
 
-  async _run({ source, bubble }: QueuedAsk): Promise<void> {
+  async _run({ source, bubble, timeoutRetries = 0 }: QueuedAsk): Promise<void> {
     this.busy = true
     this.turns += 1
 
@@ -283,21 +311,51 @@ export class Mentor {
       return
     }
 
+    // Kill ONLY this spawned child (Node maps kill to TerminateProcess on
+    // Windows). Never pkill by name: that would hit the player's Claude Code.
     let sawText = false
+    let timedOut = false
+    let settled = false
     let stderrTail = ''
-    const finish = (kind: MentorErrorKind | 'done', detail = '') => {
+    let killEscalation: ReturnType<typeof setTimeout> | undefined
+    let watchdog: ReturnType<typeof setTimeout>
+
+    const clearTimers = () => {
       clearTimeout(watchdog)
-      if (!this.busy) return
+      if (killEscalation !== undefined) clearTimeout(killEscalation)
+    }
+
+    const finish = (kind: MentorErrorKind | 'done', detail = '') => {
+      clearTimers()
+      if (settled || !this.busy) return
+      settled = true
       this.busy = false
       if (kind === 'done') this.onDone()
       else this.onError(kind, detail)
       this._drainNext()
     }
-    let watchdog = setTimeout(() => child.kill('SIGTERM'), INACTIVITY_MS)
-    const poke = () => {
-      clearTimeout(watchdog)
-      watchdog = setTimeout(() => child.kill('SIGTERM'), INACTIVITY_MS)
+
+    const killChild = () => {
+      timedOut = true
+      try {
+        child.kill('SIGTERM')
+      } catch {
+        /* already gone */
+      }
+      killEscalation = setTimeout(() => {
+        try {
+          child.kill('SIGKILL')
+        } catch {
+          /* already gone */
+        }
+      }, MENTOR_KILL_GRACE_MS)
     }
+
+    const armWatchdog = () => {
+      clearTimeout(watchdog)
+      watchdog = setTimeout(killChild, this.turnTimeoutMs)
+    }
+    watchdog = setTimeout(killChild, this.turnTimeoutMs)
 
     child.on('error', (err) => {
       finish(MENTOR_ERROR_KIND.unavailable, spawnErrorDetail(err))
@@ -309,7 +367,6 @@ export class Mentor {
 
     const lines = createInterface({ input: child.stdout })
     lines.on('line', (line) => {
-      poke()
       let event: StreamEvent
       try {
         event = JSON.parse(line) as StreamEvent
@@ -320,25 +377,51 @@ export class Mentor {
         const delta = event.event?.delta
         if (delta?.type === 'text_delta' && delta.text) {
           sawText = true
+          armWatchdog()
           this.onDelta(delta.text, bubble)
         }
       } else if (event.type === 'result') {
         // Fallback for runs where partial chunks were not emitted.
-        if (!sawText && typeof event.result === 'string') {
+        if (!sawText && typeof event.result === 'string' && event.result) {
+          sawText = true
+          armWatchdog()
           this.onDelta(event.result, bubble)
         }
       }
+      // Non-text stream lines deliberately do NOT reset the watchdog.
     })
 
     child.on('close', (code) => {
+      if (settled || !this.busy) return
+
+      // Text-timeout: no answer yet → one silent retry on a fresh session
+      // (hung --resume is a common failure mode). Partial text → keep it.
+      if (timedOut) {
+        clearTimers()
+        if (sawText) return finish('done')
+        if (timeoutRetries < MENTOR_TIMEOUT_RETRIES) {
+          settled = true
+          this.busy = false
+          this.turns -= 1
+          this.sessionId = null
+          void this._run({ source: prompt, bubble, timeoutRetries: timeoutRetries + 1 })
+          return
+        }
+        return finish(
+          MENTOR_ERROR_KIND.failed,
+          'The mentor timed out with no reply. Ask again if you still need a nudge.'
+        )
+      }
+
       if (code === 0) return finish('done')
       // Self-heal a vanished session (stale learn snapshot, cleaned ~/.claude,
       // CLI upgrade): drop the dead id and replay the SAME prompt on a fresh
       // session. Prompts are self-contained (board + transcript travel in
       // every turn), so the only loss is conversational memory. A fresh
       // --session-id turn cannot produce this error, so no retry loop.
-      if (this.busy && NO_CONVERSATION_RE.test(stderrTail)) {
-        clearTimeout(watchdog)
+      if (NO_CONVERSATION_RE.test(stderrTail)) {
+        clearTimers()
+        settled = true
         this.busy = false
         this.turns -= 1
         this.sessionId = null
@@ -395,7 +478,11 @@ Answer Socratically in 1-2 sentences.`
   if (trigger === MENTOR_TRIGGER.submitPass) {
     const dur = durationSec != null ? ` Solved in ${Math.round(durationSec)}s.` : ''
     return `${closed}${dur}
-Congratulate briefly, name the ONE concept this scenario was about, then offer to answer questions.`
+Congratulate briefly, name the ONE concept this scenario was about, then compare their transcript
+to the walkthrough. If their path is clearly longer, less idiomatic, or more fragile, offer ONE
+short craft opportunity (more direct, simple, or pragmatic), with the tighter move in backticks.
+If they already took an equally tight path, skip the opportunity. Never grade or imply they
+failed. End by offering to answer questions. 3-5 sentences max.`
   }
   if (trigger === MENTOR_TRIGGER.timeout) {
     return `${closed}

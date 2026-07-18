@@ -67,12 +67,74 @@ describe('git porcelain', () => {
     expect(log.split('\n').filter(Boolean)).toHaveLength(3)
   })
 
+  it('commit -am without a message refuses like real git (does not commit as "-am")', async () => {
+    const arena = await freshArena()
+    const before = strip((await arena.exec('git log --oneline')).stdout)
+    const r = await arena.exec('git commit -am')
+    expect(r.exitCode).toBe(129)
+    expect(strip(r.stderr)).toContain("switch `m' requires a value")
+    const after = strip((await arena.exec('git log --oneline')).stdout)
+    expect(after).toBe(before)
+  })
+
+  it('commit -m without a message refuses like real git', async () => {
+    const arena = await freshArena()
+    const r = await arena.exec('git commit -m')
+    expect(r.exitCode).toBe(129)
+    expect(strip(r.stderr)).toContain("switch `m' requires a value")
+  })
+
+  it('commit -am "msg" still stages tracked changes and commits', async () => {
+    const arena = await freshArena()
+    const r = await arena.exec('git commit -am "fix: handle failed fetch"')
+    expect(r.exitCode).toBe(0)
+    expect(strip(r.stdout)).toMatch(/^\[main [0-9a-f]{7}\] fix: handle failed fetch/)
+  })
+
+  it('add --cached refuses like real git (flag is rm/diff, not add)', async () => {
+    const arena = await freshArena()
+    const before = strip((await arena.exec('git status --short')).stdout)
+    const r = await arena.exec('git add --cached src/api/client.ts')
+    expect(r.exitCode).toBe(129)
+    expect(strip(r.stderr)).toContain("unknown option `cached'")
+    const after = strip((await arena.exec('git status --short')).stdout)
+    expect(after).toBe(before)
+  })
+
+  it('status --cached refuses like real git', async () => {
+    const arena = await freshArena()
+    const r = await arena.exec('git status --cached')
+    expect(r.exitCode).toBe(129)
+    expect(strip(r.stderr)).toContain("unknown option `cached'")
+  })
+
+  it('switch --cached and checkout --cached refuse like real git', async () => {
+    const arena = await freshArena()
+    const sw = await arena.exec('git switch --cached main')
+    expect(sw.exitCode).toBe(129)
+    expect(strip(sw.stderr)).toContain("unknown option `cached'")
+    const co = await arena.exec('git checkout --cached main')
+    expect(co.exitCode).toBe(129)
+    expect(strip(co.stderr)).toContain("unknown option `cached'")
+  })
+
   it('restore --staged unstages without touching the worktree', async () => {
     const arena = await freshArena()
     await arena.exec('git add src/api/client.ts')
     await arena.exec('git restore --staged src/api/client.ts')
     const status = strip((await arena.exec('git status --short')).stdout)
     expect(status).toContain(' M src/api/client.ts')
+  })
+
+  it('restore refuses --cached like real git (that flag is diff/rm, not restore)', async () => {
+    const arena = await freshArena()
+    await arena.exec('git add src/api/client.ts')
+    const r = await arena.exec('git restore --cached src/api/client.ts')
+    expect(r.exitCode).toBe(129)
+    expect(strip(r.stderr)).toContain("unknown option `cached'")
+    // Index untouched: still staged.
+    const status = strip((await arena.exec('git status --short')).stdout)
+    expect(status).toMatch(/M\s+src\/api\/client\.ts/)
   })
 
   it('restore <file> discards worktree changes', async () => {

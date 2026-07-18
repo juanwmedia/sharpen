@@ -29,6 +29,13 @@ setup:
   - remove: deploy.sh
   - remove: scripts/healthcheck.sh
 
+  # Discriminator: untracked scratch that restore must leave alone.
+  - write:
+      path: scratch.md
+      content: &scratch |
+        Deploy window notes
+        - verify healthcheck after the scripts are back
+
 checks:
   - name:
       en: deploy.sh is back, byte for byte
@@ -47,6 +54,15 @@ checks:
         path: scripts/healthcheck.sh
         status: unmodified
         contentEquals: *healthcheck
+
+  - name:
+      en: Your scratch notes stay untracked
+      es: Tus notas de scratch siguen sin seguimiento
+    expect:
+      file:
+        path: scratch.md
+        status: untracked
+        contentEquals: *scratch
 
   - name:
       en: Nothing staged

@@ -16,6 +16,15 @@ setup:
   - add: [src/notify.ts, README.md]
   - commit: 'feat: receipt notifications'
 
+  # Real work that SHOULD stay staged and ship next.
+  - write:
+      path: src/notify.ts
+      content: &notify-fix |
+        export function receiptSubject(orderId: string) {
+          return `Receipt for order ${orderId}`
+        }
+  - add: [src/notify.ts]
+
   # The slip: a real credential written for a local test, then staged.
   - write:
       path: .env
@@ -26,12 +35,6 @@ setup:
 
 checks:
   - name:
-      en: Nothing left staged
-      es: Nada queda en el stage
-    expect:
-      staged: none
-
-  - name:
       en: The .env file survives on disk, untracked
       es: El archivo .env sigue en disco, sin seguimiento
     expect:
@@ -39,6 +42,15 @@ checks:
         path: .env
         status: untracked
         contentEquals: *env-file
+
+  - name:
+      en: The notify fix stays staged
+      es: El fix de notify sigue en el stage
+    expect:
+      file:
+        path: src/notify.ts
+        status: staged
+        contentEquals: *notify-fix
 
   - name:
       en: History untouched on main

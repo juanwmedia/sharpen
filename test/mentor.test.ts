@@ -10,6 +10,7 @@ import {
   MENTOR_PHASE,
   MENTOR_PROMPT,
   MENTOR_TRIGGER,
+  MENTOR_TURN_TIMEOUT_MS,
 } from '../server/mentor.ts'
 import type { SpawnFn } from '../server/mentor.ts'
 
@@ -43,7 +44,11 @@ class FakeChild extends EventEmitter {
   stderr = new PassThrough()
   killedWith: string | null = null
   kill(signal?: string) {
+    // Mirror a real child: kill eventually yields close. Ignore repeat kills
+    // (SIGTERM then SIGKILL grace) so finish/retry logic sees one close.
+    if (this.killedWith !== null) return true
     this.killedWith = signal ?? null
+    queueMicrotask(() => this.emit('close', 143))
     return true
   }
 }
@@ -258,6 +263,93 @@ describe('Mentor queue', () => {
     expect(children).toHaveLength(2)
     expect(children[1]!.stdinData).toBe('q2')
   })
+
+  it('text-timeout kills only the spawned child, retries once, then errors', async () => {
+    vi.useFakeTimers()
+    const children: FakeChild[] = []
+    const spawnFn: SpawnFn = () => {
+      const child = new FakeChild()
+      children.push(child)
+      return child
+    }
+    const onDone = vi.fn()
+    const onError = vi.fn()
+    const mentor = new Mentor({
+      onDelta: vi.fn(),
+      onDone,
+      onError,
+      spawnFn,
+      turnTimeoutMs: 30,
+    })
+
+    mentor.ask('stuck question')
+    expect(children).toHaveLength(1)
+
+    // Non-text stream noise must NOT reset the watchdog.
+    children[0]!.stdout.write(
+      JSON.stringify({ type: 'stream_event', event: { delta: { type: 'input_json_delta' } } }) + '\n'
+    )
+    await vi.advanceTimersByTimeAsync(30)
+    await Promise.resolve() // close microtask from kill → silent retry
+
+    expect(children[0]!.killedWith).toBe('SIGTERM')
+    expect(children).toHaveLength(2)
+    expect(children[1]!.stdinData).toBe('stuck question')
+    expect(onError).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(30)
+    await Promise.resolve()
+
+    expect(children[1]!.killedWith).toBe('SIGTERM')
+    expect(onError).toHaveBeenCalledWith('mentor-error', expect.stringContaining('timed out'))
+    expect(onDone).not.toHaveBeenCalled()
+    expect(children).toHaveLength(2)
+
+    vi.useRealTimers()
+  })
+
+  it('text-timeout after a partial answer keeps the reply instead of retrying', async () => {
+    vi.useFakeTimers()
+    const children: FakeChild[] = []
+    const spawnFn: SpawnFn = () => {
+      const child = new FakeChild()
+      children.push(child)
+      return child
+    }
+    const onDelta = vi.fn()
+    const onDone = vi.fn()
+    const onError = vi.fn()
+    const mentor = new Mentor({
+      onDelta,
+      onDone,
+      onError,
+      spawnFn,
+      turnTimeoutMs: 30,
+    })
+
+    mentor.ask('slow closer')
+    children[0]!.stdout.write(
+      JSON.stringify({
+        type: 'stream_event',
+        event: { delta: { type: 'text_delta', text: 'Almost there' } },
+      }) + '\n'
+    )
+    await Promise.resolve()
+
+    await vi.advanceTimersByTimeAsync(30)
+    await Promise.resolve()
+
+    expect(onDelta).toHaveBeenCalledWith('Almost there', MENTOR_BUBBLE.mentor)
+    expect(onDone).toHaveBeenCalledTimes(1)
+    expect(onError).not.toHaveBeenCalled()
+    expect(children).toHaveLength(1)
+
+    vi.useRealTimers()
+  })
+
+  it('exports a 30s default turn timeout', () => {
+    expect(MENTOR_TURN_TIMEOUT_MS).toBe(30_000)
+  })
 })
 
 describe('buildMentorPrompt', () => {
@@ -332,5 +424,7 @@ describe('buildMentorPrompt', () => {
     expect(prompt).toContain('Solved in 12s')
     expect(prompt).toContain(MENTOR_PROMPT.walkthrough)
     expect(prompt).toContain('Congratulate briefly')
+    expect(prompt).toContain('craft opportunity')
+    expect(prompt).toContain('skip the opportunity')
   })
 })

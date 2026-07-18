@@ -1,11 +1,11 @@
 ---
 schema: 2
-version: 1
+version: 2
 id: git/wrong-branch-wet-paint
 kind: git
 pack: git
 title: { en: 'Wrong branch, wet paint', es: Pintura fresca en main }
-difficulty: easy
+difficulty: medium
 timeLimitMs: 90000
 spec:
   tree: |

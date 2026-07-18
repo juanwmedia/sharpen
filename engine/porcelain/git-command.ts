@@ -43,6 +43,16 @@ const ZERO_OID = '0000000'
 const ok = (stdout = ''): ExecResult => ({ stdout, stderr: '', exitCode: 0 })
 const fail = (stderr: string, exitCode = 1): ExecResult => ({ stdout: '', stderr, exitCode })
 
+/** Real git option errors exit 129 with this shape (LC_ALL=C). */
+function unknownOption(flag: string, usage: string): ExecResult {
+  const name = flag.replace(/^--?/, '')
+  return fail(`error: unknown option \`${name}'\nusage: ${usage}\n`, 129)
+}
+
+function switchRequiresValue(sw: string): ExecResult {
+  return fail(`error: switch \`${sw}' requires a value\n`, 129)
+}
+
 // isomorphic-git errors carry code/data/message; a cast keeps the original
 // output byte-identical (including "undefined" for message-less throws).
 interface GitErrorLike {
@@ -134,6 +144,11 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   // --- subcommands -----------------------------------------------------------
 
   async function cmdStatus(args: string[]): Promise<ExecResult> {
+    // Real git has no --cached on status (verified LC_ALL=C, 2026-07-18).
+    const unknown = args.find(
+      (a) => a.startsWith('-') && a !== '--' && a !== '-s' && a !== '--short'
+    )
+    if (unknown) return unknownOption(unknown, 'git status [<options>] [--] [<pathspec>...]')
     const short = args.includes('-s') || args.includes('--short')
     const matrix = await statusMatrix()
     const branch = await currentBranch()
@@ -186,6 +201,35 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   }
 
   async function cmdAdd(args: string[], cwd: string): Promise<ExecResult> {
+    // Supported here: paths, -A/--all. Real git rejects --cached on add
+    // (that flag is rm/diff); silently ignoring it used to stage anyway
+    // (verified LC_ALL=C, 2026-07-18). Flags that exist in real git but not
+    // here name the arena gap instead of "unknown option".
+    const ADD_SUPPORTED = new Set(['-A', '--all', '--'])
+    const ADD_REAL_BUT_MISSING = new Set([
+      '-u',
+      '--update',
+      '-p',
+      '--patch',
+      '-n',
+      '--dry-run',
+      '-f',
+      '--force',
+      '-v',
+      '--verbose',
+      '-i',
+      '--interactive',
+      '-N',
+      '--intent-to-add',
+    ])
+    for (const a of args) {
+      if (!a.startsWith('-') || a === '--') continue
+      if (ADD_SUPPORTED.has(a)) continue
+      if (ADD_REAL_BUT_MISSING.has(a)) {
+        return fail(`sharpen: 'git add ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      return unknownOption(a, 'git add [<options>] [--] <pathspec>...')
+    }
     const paths = args.filter((a) => !a.startsWith('-'))
     const all = args.includes('-A') || args.includes('--all')
     if (!paths.length && !all) {
@@ -212,12 +256,39 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   }
 
   async function cmdCommit(args: string[]): Promise<ExecResult> {
-    const mIndex = args.indexOf('-m')
-    const all = args.includes('-a') || args.includes('-am')
-    if (args.includes('-am')) args.splice(args.indexOf('-am'), 0, '-m')
-    const msgIdx = args.indexOf('-m') >= 0 ? args.indexOf('-m') : mIndex
-    const message = msgIdx >= 0 ? args[msgIdx + 1] : undefined
-    if (!message) {
+    // Parse -a / -m / -am like real git: -am is -a plus -m, and -m always
+    // requires a following value. Bare `git commit -am` used to commit with
+    // message "-am" (wet-paint incident); real git exits 129 with
+    // switch `m' requires a value (LC_ALL=C, 2026-07-18).
+    let all = false
+    let message: string | undefined
+    let expectingMessage = false
+    for (const a of args) {
+      if (expectingMessage) {
+        message = a
+        expectingMessage = false
+        continue
+      }
+      if (a === '-am') {
+        all = true
+        expectingMessage = true
+        continue
+      }
+      if (a === '-a') {
+        all = true
+        continue
+      }
+      if (a === '-m') {
+        expectingMessage = true
+        continue
+      }
+      if (a.startsWith('-')) {
+        return fail(`sharpen: 'git commit ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      return fail(`sharpen: 'git commit' with path arguments is not available in this arena (yet)\n`, 1)
+    }
+    if (expectingMessage) return switchRequiresValue('m')
+    if (message === undefined) {
       return fail('error: no commit message provided (use git commit -m "message")\n', 1)
     }
     let matrix = await statusMatrix()
@@ -246,6 +317,22 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   }
 
   async function cmdLog(args: string[]): Promise<ExecResult> {
+    // Supported: --oneline, -n N, -N. Real-but-missing flags name the gap;
+    // invented flags get git's unknown-option refusal.
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i]!
+      if (!a.startsWith('-')) continue
+      if (a === '--oneline' || /^-\d+$/.test(a)) continue
+      if (a === '-n') {
+        if (args[i + 1] === undefined || args[i + 1]!.startsWith('-')) return switchRequiresValue('n')
+        i += 1
+        continue
+      }
+      if (a === '-p' || a === '--patch' || a === '--stat' || a === '--all' || a === '--graph') {
+        return fail(`sharpen: 'git log ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      return unknownOption(a, 'git log [<options>]')
+    }
     const oneline = args.includes('--oneline')
     let depth: number | undefined
     const nIdx = args.indexOf('-n')
@@ -477,22 +564,59 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   async function cmdCheckout(args: string[], cwd: string): Promise<ExecResult> {
     const first = args[0]
     if (first === undefined) return fail('fatal: you must specify a branch or paths\n', 128)
+    // Real git: no --cached on checkout (LC_ALL=C, 2026-07-18). Supported
+    // here: -b, -- <paths>, branch name, pathspecs.
     const dashdash = args.indexOf('--')
+    const flagArgs = (dashdash >= 0 ? args.slice(0, dashdash) : args).filter((a) => a.startsWith('-'))
+    for (const a of flagArgs) {
+      if (a === '-b' || a === '--') continue
+      if (a === '-B' || a === '-f' || a === '--force' || a === '-d' || a === '--detach') {
+        return fail(`sharpen: 'git checkout ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      return unknownOption(a, 'git checkout [<options>] <branch>')
+    }
     if (dashdash >= 0) return checkoutPaths(cwd, args.slice(dashdash + 1))
-    if (first === '-b') return createAndSwitch(args[1])
+    if (first === '-b') {
+      if (!args[1] || args[1].startsWith('-')) return fail('fatal: branch name required\n', 128)
+      return createAndSwitch(args[1])
+    }
     const branches = await git.listBranches({ fs, dir })
     if (branches.includes(first)) return switchBranch(first)
     return checkoutPaths(cwd, args)
   }
 
   async function cmdSwitch(args: string[]): Promise<ExecResult> {
-    if (args[0] === '-c') return createAndSwitch(args[1])
+    // Real git: no --cached on switch (LC_ALL=C, 2026-07-18). Supported: -c, branch.
+    for (const a of args) {
+      if (!a.startsWith('-')) continue
+      if (a === '-c') continue
+      if (a === '-C' || a === '-d' || a === '--detach' || a === '-f' || a === '--force') {
+        return fail(`sharpen: 'git switch ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      return unknownOption(a, 'git switch [<options>] [<branch>]')
+    }
+    if (args[0] === '-c') {
+      if (!args[1] || args[1].startsWith('-')) return fail('fatal: branch name required\n', 128)
+      return createAndSwitch(args[1])
+    }
     const target = args[0]
     if (!target) return fail('fatal: missing branch or commit argument\n', 128)
     return switchBranch(target)
   }
 
   async function cmdRestore(args: string[], cwd: string): Promise<ExecResult> {
+    // Real git restore accepts --staged, not --cached (unlike diff/rm). A
+    // silent ignore turned `git restore --cached .env` into a worktree restore
+    // and a misleading pathspec error (verified LC_ALL=C, 2026-07-18).
+    const unknown = args.find((a) => a.startsWith('-') && a !== '--' && a !== '--staged')
+    if (unknown) {
+      const flag = unknown.replace(/^--?/, '')
+      return fail(
+        `error: unknown option \`${flag}'\n` +
+          'usage: git restore [<options>] [--source=<branch>] <file>...\n',
+        129
+      )
+    }
     const staged = args.includes('--staged')
     const paths = args.filter((a) => !a.startsWith('-'))
     if (!paths.length) return fail('fatal: you must specify path(s) to restore\n', 128)
@@ -602,6 +726,14 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   }
 
   async function cmdRm(args: string[], cwd: string): Promise<ExecResult> {
+    for (const a of args) {
+      if (!a.startsWith('-') || a === '--') continue
+      if (a === '--cached' || a === '-f' || a === '--force') continue
+      if (a === '-r' || a === '--recursive') {
+        return fail(`sharpen: 'git rm ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      return unknownOption(a, 'git rm [<options>] [--] <file>...')
+    }
     const cached = args.includes('--cached')
     const force = args.includes('-f') || args.includes('--force')
     const paths = args.filter((a) => !a.startsWith('-'))
