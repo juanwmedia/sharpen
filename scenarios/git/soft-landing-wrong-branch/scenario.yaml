@@ -1,0 +1,64 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/banner.ts
+      content: |
+        export const BANNER_SLOT = 'home-hero'
+  - add: [src/banner.ts]
+  - commit: 'chore: empty banner slot'
+
+  # Destination branch parked at the base before the slip.
+  - branch: feature/promo-banner
+
+  - branch:
+      name: release
+      checkout: true
+
+  - write:
+      path: src/banner.ts
+      content: &banner |
+        export const BANNER_SLOT = 'home-hero'
+        export const PROMO_COPY = 'Free shipping this weekend'
+  - add: [src/banner.ts]
+  - commit: 'feat: weekend promo banner'
+
+checks:
+  - name:
+      en: HEAD is feature/promo-banner with the banner committed
+      es: HEAD es feature/promo-banner con el banner commiteado
+    expect:
+      head:
+        branch: feature/promo-banner
+        commits: 2
+
+  - name:
+      en: The banner file is the promo work, clean
+      es: El archivo del banner es el trabajo de promo, limpio
+    expect:
+      file:
+        path: src/banner.ts
+        status: unmodified
+        contentEquals: *banner
+
+  - name:
+      en: release went back to one commit
+      es: release volvió a un commit
+    expect:
+      branch:
+        name: release
+        commits: 1
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git reset --soft HEAD~
+    - git switch feature/promo-banner
+    - "git commit -m 'feat: weekend promo banner'"

@@ -1,0 +1,1 @@
+`git reflog` lists recent HEAD moves, newest first. After the hard reset, `HEAD@{0}` is the rewind and `HEAD@{1}` is the refactor tip you lost. Quote the selector in the shell (`git reset --hard 'HEAD@{1}'`) so bash does not brace-expand it, then hard-reset back onto that oid. Soft reset would leave the old tree staged; here you want the tip and the worktree restored together.

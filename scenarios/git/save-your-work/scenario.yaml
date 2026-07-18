@@ -1,0 +1,63 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: README.md
+      content: |
+        # desk-badge
+
+        Tiny status badge for the ops dashboard.
+  - add: [README.md]
+  - commit: 'chore: bootstrap desk-badge'
+
+  - write:
+      path: src/badge.ts
+      content: &badge |
+        export function formatBadge(ok: boolean): string {
+          return ok ? 'all green' : 'degraded'
+        }
+  - write:
+      path: scratch.txt
+      content: |
+        why is the svg null
+        try console.log again
+        DO NOT COMMIT THIS
+
+checks:
+  - name:
+      en: The badge is committed
+      es: El badge está commiteado
+    expect:
+      file:
+        path: src/badge.ts
+        status: unmodified
+        contentEquals: *badge
+
+  - name:
+      en: Exactly one new commit on main
+      es: Exactamente un commit nuevo en main
+    expect:
+      head:
+        branch: main
+        commits: 2
+
+  - name:
+      en: Your scratch notes stay local
+      es: Tus notas scratch se quedan en local
+    expect:
+      file:
+        path: scratch.txt
+        status: untracked
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git add src/badge.ts
+    - "git commit -m 'feat: status badge label'"

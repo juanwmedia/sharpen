@@ -1,0 +1,1 @@
+The badge only exists as an untracked file until you stage that path and commit it. `git add src/badge.ts` then `git commit -m` with a short message about the badge. Do not `git add -A` or `git add .`: that would drag `scratch.txt` into history. `git status` before the commit is how you see exactly what would travel. Any route to the same end state passes.

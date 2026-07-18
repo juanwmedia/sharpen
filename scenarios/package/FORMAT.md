@@ -112,10 +112,12 @@ solution:
 ```
 
 - **Setup ops** mirror `ScenarioSetupEnv` one to one: `write`, `remove`,
-  `add`, `commit`, `branch`, `checkout`. Deterministic by construction: a
-  document cannot call `Date.now()`. `add` mirrors real git: staging a path
-  that no longer exists on disk records the deletion (that is how a setup
-  fabricates a staged `git rm`).
+  `add`, `commit`, `branch`, `checkout`, `reset` (`{ mode: soft|hard, to }`).
+  Deterministic by construction: a document cannot call `Date.now()`. `add`
+  mirrors real git: staging a path that no longer exists on disk records the
+  deletion (that is how a setup fabricates a staged `git rm`). `reset` moves
+  the current branch tip and appends reflog (needed when the player starts
+  "after" a destructive move).
 - **Check predicates**: `untracked: none`, `staged: none`,
   `head: { branch?, commits? }`, `branch: { name, commits? | absent: true }`
   (any branch tip: prove main never moved while HEAD is elsewhere, or that

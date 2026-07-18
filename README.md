@@ -106,17 +106,18 @@ prompt too: any unimplemented subcommand answers
 `sharpen: 'git X' is not available in this arena (yet)`.
 
 **Git porcelain implemented today:** `status` (`-s`), `add` (paths, `-A`),
-`commit` (`-m`, `-a`, `-am`), `log` (`--oneline`, `-n`), `branch` (list,
-create, `-d` with the real unmerged refusal, `-D`), `checkout` (`-b`, branch,
-`-- <paths>`), `switch` (plain and `-c`), `restore` (`--staged`, pathspecs),
-`clean` (`-n`, `-f`, `-d`), `rm` (`--cached`, `-f`, with real git's refusals
-on staged or modified files), `reset` (the unstage form:
-bare, paths, `HEAD <paths>`), `diff` (unstaged and `--staged`/`--cached`,
+`commit` (`-m`, `-a`, `-am`, `--amend` with `-m` or `--no-edit`), `log`
+(`--oneline`, `-n`), `branch` (list, create, `-d` with the real unmerged
+refusal, `-D`), `checkout` (`-b`, branch, `-- <paths>`), `switch` (plain and
+`-c`), `restore` (`--staged`, pathspecs), `clean` (`-n`, `-f`, `-d`), `rm`
+(`--cached`, `-f`, with real git's refusals on staged or modified files),
+`reset` (unstage form; `--soft`/`--hard` with `HEAD~`, oid, branch, or
+`HEAD@{n}`), `reflog` (`-n`), `diff` (unstaged and `--staged`/`--cached`,
 with real git's colors and hunk format), `init`.
 
-**Not there yet, planned in this order:** `reset --soft`/`--hard` over
-history, `commit --amend`, `reflog`, `stash`, `cherry-pick`, `revert`,
-`restore --source`, `merge` with real conflict markers.
+**Not there yet, planned in this order:** `reset --mixed` against a commit,
+`stash`, `cherry-pick`, `revert`, `restore --source`, `merge` with real
+conflict markers.
 
 **Out of scope by design:** remotes (`push`, `pull`, `fetch`, `clone`): the
 arena is a local, deterministic sandbox. `rebase`: it does not fit the timed

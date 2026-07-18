@@ -1,0 +1,60 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/auth.ts
+      content: |
+        export function isLoggedIn(token: string | null): boolean {
+          return Boolean(token)
+        }
+  - add: [src/auth.ts]
+  - commit: 'feat: auth guard'
+
+  - write:
+      path: src/auth.ts
+      content: &auth-fix |
+        export function isLoggedIn(token: string | null): boolean {
+          return typeof token === 'string' && token.length > 0
+        }
+  - add: [src/auth.ts]
+
+  - write:
+      path: notes.local
+      content: &notes |
+        private: do not ship
+        standup talking points
+  - add: [notes.local]
+
+checks:
+  - name:
+      en: Auth fix stays staged
+      es: El fix de auth sigue en el stage
+    expect:
+      file:
+        path: src/auth.ts
+        status: staged
+        contentEquals: *auth-fix
+
+  - name:
+      en: notes.local is untracked on disk
+      es: notes.local está sin seguimiento en disco
+    expect:
+      file:
+        path: notes.local
+        status: untracked
+        contentEquals: *notes
+
+  - name:
+      en: History untouched on main
+      es: Historial intacto en main
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git diff --staged
+    - git restore --staged notes.local

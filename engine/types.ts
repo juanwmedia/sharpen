@@ -76,6 +76,8 @@ export interface ScenarioSetupEnv {
   commit(message: string): Promise<string>
   branch(name: string, opts?: { checkout?: boolean }): Promise<void>
   checkout(ref: string): Promise<void>
+  /** Move the current branch tip (--soft/--hard). Writes reflog like porcelain. */
+  reset(opts: { mode: 'soft' | 'hard'; to: string }): Promise<void>
 }
 
 export interface ScenarioAssertContext {

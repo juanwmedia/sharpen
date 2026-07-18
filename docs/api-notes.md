@@ -60,9 +60,19 @@ dependency upgrades.
   (`error: switch \`m' requires a value`); never treat `-am` as the message.
   `git add --cached`, `git status --cached`, `git switch --cached`, and
   `git checkout --cached` all exit 129 with `unknown option \`cached'`.
-- Still absent: reflog for general refs (only stash keeps its own entry
-  list) and all rebase machinery. reset/revert/reflog porcelain stays
-  hand-written over `writeRef`/`resetIndex`/`readCommit`/`walk`.
+- Still absent from isomorphic-git: general reflog and all rebase machinery.
+  Arena reflog is hand-written (`engine/porcelain/reflog.ts`): append-only
+  `.git/logs/HEAD` (+ branch log) in real git's line format; `git reflog`
+  lists newest-first; `HEAD@{n}` resolves against that file. Instrument
+  commit, amend, switch, create-and-switch, and reset --soft/--hard.
+  Quote `'HEAD@{n}'` in the shell: unquoted braces are bash brace-expansion.
+- `git.commit({ amend: true })` verified: folds staged changes into a
+  replacement HEAD commit. Arena exposes `--amend` with `-m` or `--no-edit`
+  only (no editor). Soft reset: `writeRef` tip move, leave index/worktree.
+  Hard reset: tip move + `checkout({ ref: branch, force: true })` (checkout
+  by oid detaches HEAD in isomorphic-git; always re-assert symbolic HEAD).
+  Mixed reset against a commit stays "not available (yet)".
+- Still absent porcelain: stash, cherry-pick, revert, rebase, remotes.
 - For `git diff` output, `diff@8.0.4` (kpdecker) is already a transitive
   dependency via just-bash: unified/structured patch generation without
   adding a new package.

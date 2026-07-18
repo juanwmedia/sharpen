@@ -3,6 +3,7 @@ import type { FsClient } from 'isomorphic-git'
 import { Bash, InMemoryFs } from 'just-bash'
 import { createGitFs } from './fs-bridge.ts'
 import { createGitCommand } from './porcelain/git-command.ts'
+import { appendReflog } from './porcelain/reflog.ts'
 import { dirname, join } from './paths.ts'
 import { takeSnapshot, stateHash } from './snapshot.ts'
 import { ARENA_DEFAULT_BRANCH } from './types.ts'
@@ -58,14 +59,89 @@ export async function createArena(scenario: Scenario): Promise<Arena> {
       }
     },
     async commit(message) {
-      const author = { ...SETUP_AUTHOR, ...clock() }
-      return git.commit({ fs, dir, message, author, committer: author })
+      let oldOid: string | null = null
+      try {
+        oldOid = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+      } catch {
+        /* unborn HEAD */
+      }
+      const when = clock()
+      const author = { ...SETUP_AUTHOR, ...when }
+      const oid = await git.commit({ fs, dir, message, author, committer: author })
+      const branch = (await git.currentBranch({ fs, dir, fullname: false })) ?? ARENA_DEFAULT_BRANCH
+      const kind = oldOid ? 'commit' : 'commit (initial)'
+      await appendReflog(jbFs, dir, {
+        oldOid,
+        newOid: oid,
+        author: { ...SETUP_AUTHOR, ...when },
+        message: `${kind}: ${message.split('\n')[0]}`,
+        branch,
+      })
+      return oid
     },
     async branch(name, { checkout = false } = {}) {
+      const head = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+      const from = (await git.currentBranch({ fs, dir, fullname: false })) ?? ARENA_DEFAULT_BRANCH
       await git.branch({ fs, dir, ref: name, checkout })
+      if (checkout) {
+        const when = clock()
+        await appendReflog(jbFs, dir, {
+          oldOid: head,
+          newOid: head,
+          author: { ...SETUP_AUTHOR, ...when },
+          message: `checkout: moving from ${from} to ${name}`,
+          branch: name,
+        })
+      }
     },
     async checkout(ref) {
+      const oldOid = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+      const oldBranch = (await git.currentBranch({ fs, dir, fullname: false })) ?? 'HEAD'
       await git.checkout({ fs, dir, ref })
+      const newOid = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+      const when = clock()
+      await appendReflog(jbFs, dir, {
+        oldOid,
+        newOid,
+        author: { ...SETUP_AUTHOR, ...when },
+        message: `checkout: moving from ${oldBranch} to ${ref}`,
+        branch: (await git.currentBranch({ fs, dir, fullname: false })) ?? undefined,
+      })
+    },
+    async reset({ mode, to }) {
+      const branch = (await git.currentBranch({ fs, dir, fullname: false })) ?? ARENA_DEFAULT_BRANCH
+      const oldOid = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+      let targetOid: string
+      if (to === 'HEAD' || to === 'HEAD~' || /^HEAD~\d+$/.test(to)) {
+        const n = to === 'HEAD' ? 0 : to === 'HEAD~' ? 1 : Number(to.slice(5))
+        const log = await git.log({ fs, dir, depth: n + 1 })
+        const entry = log[n]
+        if (!entry) throw new Error(`setup reset: cannot resolve ${to}`)
+        targetOid = entry.oid
+      } else {
+        targetOid = await git.resolveRef({ fs, dir, ref: to })
+      }
+      await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: targetOid, force: true })
+      if (mode === 'hard') {
+        // Branch name, not oid: oid checkout detaches HEAD in isomorphic-git.
+        await git.checkout({ fs, dir, ref: branch, force: true })
+      }
+      await git.writeRef({
+        fs,
+        dir,
+        ref: 'HEAD',
+        value: `refs/heads/${branch}`,
+        symbolic: true,
+        force: true,
+      })
+      const when = clock()
+      await appendReflog(jbFs, dir, {
+        oldOid,
+        newOid: targetOid,
+        author: { ...SETUP_AUTHOR, ...when },
+        message: `reset: moving to ${to}`,
+        branch,
+      })
     },
   }
   await scenario.setup(setup)

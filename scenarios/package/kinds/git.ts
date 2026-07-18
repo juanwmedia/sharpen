@@ -26,7 +26,7 @@ import { DEFAULT_TIME_LIMIT_MS } from '../types.ts'
 
 /** The setup vocabulary. One-to-one with ScenarioSetupEnv helpers: extending
  * it means adding a helper first, then a parser case here. */
-const SETUP_OPS = ['write', 'remove', 'add', 'commit', 'branch', 'checkout'] as const
+const SETUP_OPS = ['write', 'remove', 'add', 'commit', 'branch', 'checkout', 'reset'] as const
 
 type SetupStep =
   | { op: 'write'; path: string; content: string }
@@ -35,6 +35,7 @@ type SetupStep =
   | { op: 'commit'; message: string }
   | { op: 'branch'; name: string; checkout: boolean }
   | { op: 'checkout'; ref: string }
+  | { op: 'reset'; mode: 'soft' | 'hard'; to: string }
 
 function singleKeyOf(raw: unknown, at: string): { key: string; value: unknown } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -85,6 +86,19 @@ function parseSetupStep(raw: unknown, index: number): SetupStep {
       if (typeof value !== 'string' || !value) throw new Error(`${at}: checkout needs a ref string`)
       return { op: 'checkout', ref: value }
     }
+    case 'reset': {
+      const v = value as { mode?: unknown; to?: unknown } | null
+      if (
+        !v ||
+        typeof v !== 'object' ||
+        (v.mode !== 'soft' && v.mode !== 'hard') ||
+        typeof v.to !== 'string' ||
+        !v.to
+      ) {
+        throw new Error(`${at}: reset needs { mode: soft|hard, to }`)
+      }
+      return { op: 'reset', mode: v.mode, to: v.to }
+    }
     default:
       throw new Error(`${at}: unknown op "${op}"; this engine supports: ${SETUP_OPS.join(', ')}`)
   }
@@ -111,6 +125,9 @@ function buildSetup(steps: SetupStep[]): (env: ScenarioSetupEnv) => Promise<void
           break
         case 'checkout':
           await env.checkout(step.ref)
+          break
+        case 'reset':
+          await env.reset({ mode: step.mode, to: step.to })
           break
         default: {
           const never: never = step
@@ -253,6 +270,10 @@ function stagedFiles(ctx: ScenarioAssertContext): string[] {
   return ctx.snapshot.status.filter(([, , , stage]) => stage >= 2).map(([path]) => path)
 }
 
+function nCommits(n: number): string {
+  return n === 1 ? '1 commit' : `${n} commits`
+}
+
 async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): Promise<Check> {
   const { spec } = check
   switch (spec.predicate) {
@@ -287,7 +308,7 @@ async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): 
       const expectedParts = (join: string) =>
         [
           spec.branch !== undefined ? spec.branch : null,
-          spec.commits !== undefined ? `${spec.commits} commits` : null,
+          spec.commits !== undefined ? nCommits(spec.commits) : null,
         ]
           .filter(Boolean)
           .join(join)
@@ -295,8 +316,8 @@ async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): 
         name: check.name,
         pass,
         detail: {
-          en: `HEAD is ${branch} with ${commits} commits (expected ${expectedParts(' with ')})`,
-          es: `HEAD es ${branch} con ${commits} commits (esperado ${expectedParts(' con ')})`,
+          en: `HEAD is ${branch} with ${nCommits(commits)} (expected ${expectedParts(' with ')})`,
+          es: `HEAD es ${branch} con ${nCommits(commits)} (esperado ${expectedParts(' con ')})`,
         },
       }
     }
@@ -334,8 +355,8 @@ async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): 
         name: check.name,
         pass: commits === spec.commits,
         detail: {
-          en: `${spec.name} is at ${commits} commits (expected ${spec.commits})`,
-          es: `${spec.name} está en ${commits} commits (esperado ${spec.commits})`,
+          en: `${spec.name} is at ${nCommits(commits)} (expected ${nCommits(spec.commits)})`,
+          es: `${spec.name} está en ${nCommits(commits)} (esperado ${nCommits(spec.commits)})`,
         },
       }
     }

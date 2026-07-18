@@ -1,0 +1,55 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/app.ts
+      content: |
+        export const APP_NAME = 'canvas'
+  - add: [src/app.ts]
+  - commit: 'feat: canvas shell'
+
+  - write:
+      path: src/theme.ts
+      content: &theme |
+        export type Theme = 'light' | 'dark'
+        export const DEFAULT_THEME: Theme = 'dark'
+  - add: [src/theme.ts]
+  - commit: 'feat: dark mode toggle'
+
+checks:
+  - name:
+      en: HEAD is main with one commit
+      es: HEAD es main con un commit
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+  - name:
+      en: feature/dark-mode kept the tip
+      es: feature/dark-mode conservó el tip
+    expect:
+      branch:
+        name: feature/dark-mode
+        commits: 2
+
+  - name:
+      en: theme.ts is gone from main's tree
+      es: theme.ts ya no está en el árbol de main
+    expect:
+      file:
+        path: src/theme.ts
+        status: absent
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git branch feature/dark-mode
+    - git reset --hard HEAD~

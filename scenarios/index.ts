@@ -1,26 +1,39 @@
 import abortTheExperiment from './git/abort-the-experiment/index.ts'
 import cleanSweep from './git/clean-sweep/index.ts'
+import forgotTheReceipt from './git/forgot-the-receipt/index.ts'
 import halfDeleted from './git/half-deleted/index.ts'
 import leakedSecret from './git/leaked-secret/index.ts'
+import notOnMain from './git/not-on-main/index.ts'
+import saveYourWork from './git/save-your-work/index.ts'
 import shipOnlyTheFix from './git/ship-only-the-fix/index.ts'
+import softLandingWrongBranch from './git/soft-landing-wrong-branch/index.ts'
+import stagedButInvisible from './git/staged-but-invisible/index.ts'
+import takeItBack from './git/take-it-back/index.ts'
 import theVanishedFile from './git/the-vanished-file/index.ts'
+import timeMachineRecovery from './git/time-machine-recovery/index.ts'
+import tipBelongsOnFeature from './git/tip-belongs-on-feature/index.ts'
 import wrongBranchWetPaint from './git/wrong-branch-wet-paint/index.ts'
 import { slugify } from './slug.ts'
 import type { Scenario, ScenarioSummary } from '../engine/types.ts'
 
-// Single registry consumed by the web bundle (setup + local execution) and the
-// server (authoritative replay validation). Order defines display order and is
-// curated easy to hard: concept progression, not alphabet.
-// Restore-family scenarios (vanished file, abort experiment) stay non-adjacent:
-// same family, different situation, spaced reps. Clean sweep sits mid-pack so
-// the finale is the two-layer pathspec undo (half-deleted), not a one-liner.
+// Display order is curated easy to hard (concept progression, not alphabet).
+// Same-family scenarios stay spaced: restore path vs deleted; first branch
+// vs wet-paint; unstage inspect vs secret stakes.
 export const scenarios: Scenario[] = [
-  theVanishedFile,
-  leakedSecret,
+  saveYourWork,
+  takeItBack,
+  notOnMain,
   shipOnlyTheFix,
+  stagedButInvisible,
+  leakedSecret,
+  theVanishedFile,
   cleanSweep,
   wrongBranchWetPaint,
   abortTheExperiment,
+  forgotTheReceipt,
+  softLandingWrongBranch,
+  tipBelongsOnFeature,
+  timeMachineRecovery,
   halfDeleted,
 ]
 

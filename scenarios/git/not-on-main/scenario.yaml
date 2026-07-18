@@ -1,0 +1,65 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: README.md
+      content: |
+        # lobby
+
+        Public lobby shell for new accounts.
+  - add: [README.md]
+  - commit: 'chore: bootstrap lobby'
+
+  - write:
+      path: src/banner.ts
+      content: &banner |
+        export function welcomeBanner(name: string): string {
+          return `Welcome aboard, ${name}.`
+        }
+
+checks:
+  - name:
+      en: HEAD is feature/welcome-banner with the banner committed
+      es: HEAD es feature/welcome-banner con el banner commiteado
+    expect:
+      head:
+        branch: feature/welcome-banner
+        commits: 2
+
+  - name:
+      en: The committed file is the banner
+      es: El archivo commiteado es el banner
+    expect:
+      file:
+        path: src/banner.ts
+        status: unmodified
+        contentEquals: *banner
+
+  - name:
+      en: main never moved
+      es: main no se movió
+    expect:
+      branch:
+        name: main
+        commits: 1
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+  - name:
+      en: No untracked files remain
+      es: No queda nada sin seguimiento
+    expect:
+      untracked: none
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git branch feature/welcome-banner
+    - git switch feature/welcome-banner
+    - git add src/banner.ts
+    - "git commit -m 'feat: welcome banner copy'"

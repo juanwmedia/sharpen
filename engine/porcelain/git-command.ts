@@ -5,6 +5,12 @@ import { defineCommand } from 'just-bash'
 import type { Command, ExecResult, IFileSystem } from 'just-bash'
 import { dirname, repoRelative, resolve } from '../paths.ts'
 import type { GitFs, StatusRow } from '../types.ts'
+import {
+  appendReflog,
+  formatReflog,
+  readReflog,
+  resolveReflogAt,
+} from './reflog.ts'
 
 // Hand-written git porcelain over isomorphic-git. This is the layer that makes
 // the arena feel like real git: faithful output, faithful refusals, and
@@ -24,7 +30,7 @@ const PLAYER = { name: 'you', email: 'you@sharpen.arena' }
 // Implemented elsewhere in git but intentionally absent here (yet). Kept
 // separate from unknown commands so the arena never lies about what git is.
 const NOT_IN_ARENA = [
-  'rebase', 'reflog', 'stash', 'revert', 'cherry-pick', 'merge',
+  'rebase', 'stash', 'revert', 'cherry-pick', 'merge',
   'mv', 'bisect', 'remote', 'push', 'pull', 'fetch', 'tag', 'clone',
   'show', 'blame', 'apply', 'format-patch', 'worktree', 'submodule',
 ]
@@ -256,11 +262,11 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   }
 
   async function cmdCommit(args: string[]): Promise<ExecResult> {
-    // Parse -a / -m / -am like real git: -am is -a plus -m, and -m always
-    // requires a following value. Bare `git commit -am` used to commit with
-    // message "-am" (wet-paint incident); real git exits 129 with
-    // switch `m' requires a value (LC_ALL=C, 2026-07-18).
+    // Parse -a / -m / -am / --amend / --no-edit. -am is -a plus -m; -m always
+    // requires a following value (LC_ALL=C, 2026-07-18).
     let all = false
+    let amend = false
+    let noEdit = false
     let message: string | undefined
     let expectingMessage = false
     for (const a of args) {
@@ -282,15 +288,21 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
         expectingMessage = true
         continue
       }
+      if (a === '--amend') {
+        amend = true
+        continue
+      }
+      if (a === '--no-edit') {
+        noEdit = true
+        continue
+      }
       if (a.startsWith('-')) {
         return fail(`sharpen: 'git commit ${a}' is not available in this arena (yet)\n`, 1)
       }
       return fail(`sharpen: 'git commit' with path arguments is not available in this arena (yet)\n`, 1)
     }
     if (expectingMessage) return switchRequiresValue('m')
-    if (message === undefined) {
-      return fail('error: no commit message provided (use git commit -m "message")\n', 1)
-    }
+
     let matrix = await statusMatrix()
     if (all) {
       await stageTrackedChanges(matrix)
@@ -301,6 +313,59 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
       return c.stagedNew || c.stagedModified || c.stagedDeleted
     })
     const branch = await currentBranch()
+
+    let oldOid: string | null = null
+    try {
+      oldOid = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+    } catch {
+      oldOid = null
+    }
+
+    if (amend) {
+      if (!oldOid) {
+        return fail('fatal: You have nothing to amend.\n', 128)
+      }
+      if (noEdit && message === undefined) {
+        const head = await git.readCommit({ fs, dir, oid: oldOid })
+        message = head.commit.message.replace(/\n$/, '')
+      }
+      if (message === undefined) {
+        return fail(
+          'error: commit --amend needs -m <msg> or --no-edit in this arena (no editor)\n',
+          1
+        )
+      }
+      // Real git allows amend with a clean index when only rewriting the
+      // message; with staged changes it folds them into the replaced commit.
+      if (!hasStaged && !noEdit && message) {
+        /* message-only amend: ok */
+      } else if (!hasStaged && noEdit) {
+        // --no-edit with nothing staged still rewrites the commit (same tree).
+      }
+      const when = clock()
+      const author = { ...PLAYER, ...when }
+      const oid = await git.commit({
+        fs,
+        dir,
+        message,
+        author,
+        committer: author,
+        amend: true,
+      })
+      const subject = message.split('\n')[0]!
+      await appendReflog(jbFs, dir, {
+        oldOid,
+        newOid: oid,
+        author: { ...PLAYER, ...when },
+        message: `commit (amend): ${subject}`,
+        branch,
+      })
+      return ok(`[${branch} ${shortOid(oid)}] ${subject}\n`)
+    }
+
+    if (message === undefined) {
+      return fail('error: no commit message provided (use git commit -m "message")\n', 1)
+    }
     if (!hasStaged) {
       const dirty = matrix.some((row) => !classifyRow(row).clean)
       return fail(
@@ -313,7 +378,16 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
     const when = clock()
     const author = { ...PLAYER, ...when }
     const oid = await git.commit({ fs, dir, message, author, committer: author })
-    return ok(`[${branch} ${shortOid(oid)}] ${message}\n`)
+    const subject = message.split('\n')[0]!
+    const kind = oldOid ? 'commit' : 'commit (initial)'
+    await appendReflog(jbFs, dir, {
+      oldOid,
+      newOid: oid,
+      author: { ...PLAYER, ...when },
+      message: `${kind}: ${subject}`,
+      branch,
+    })
+    return ok(`[${branch} ${shortOid(oid)}] ${subject}\n`)
   }
 
   async function cmdLog(args: string[]): Promise<ExecResult> {
@@ -545,7 +619,16 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
         }
       }
     }
+    const from = current ?? 'HEAD'
     await git.writeRef({ fs, dir, ref: 'HEAD', value: `refs/heads/${name}`, symbolic: true, force: true })
+    const when = clock()
+    await appendReflog(jbFs, dir, {
+      oldOid: headOid,
+      newOid: targetOid,
+      author: { ...PLAYER, ...when },
+      message: `checkout: moving from ${from} to ${name}`,
+      branch: name,
+    })
     return ok((await carriedChanges()) + `Switched to branch '${name}'\n`)
   }
 
@@ -554,10 +637,48 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   async function createAndSwitch(name: string | undefined): Promise<ExecResult> {
     if (!name) return fail('fatal: branch name required\n', 128)
     try {
+      const head = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+      const from = (await currentBranch()) ?? 'HEAD'
       await git.branch({ fs, dir, ref: name, checkout: true })
+      const when = clock()
+      await appendReflog(jbFs, dir, {
+        oldOid: head,
+        newOid: head,
+        author: { ...PLAYER, ...when },
+        message: `checkout: moving from ${from} to ${name}`,
+        branch: name,
+      })
       return ok(`Switched to a new branch '${name}'\n`)
     } catch (err) {
       return fail(`fatal: ${gitError(err).message}\n`, 128)
+    }
+  }
+
+  /** Resolve HEAD, HEAD~N, HEAD@{n}, branch name, or oid. */
+  async function resolveRevision(spec: string): Promise<string | null> {
+    const reflogAt = spec.match(/^HEAD@\{(\d+)\}$/)
+    if (reflogAt) {
+      return resolveReflogAt(jbFs, dir, Number(reflogAt[1]))
+    }
+    if (spec === 'HEAD' || spec === 'HEAD~' || /^HEAD~\d+$/.test(spec)) {
+      const n = spec === 'HEAD' ? 0 : spec === 'HEAD~' ? 1 : Number(spec.slice(5))
+      try {
+        const log = await git.log({ fs, dir, depth: n + 1 })
+        return log[n]?.oid ?? null
+      } catch {
+        return null
+      }
+    }
+    try {
+      return await git.resolveRef({ fs, dir, ref: spec })
+    } catch {
+      /* fall through */
+    }
+    try {
+      const expanded = await git.expandOid({ fs, dir, oid: spec })
+      return expanded
+    } catch {
+      return null
     }
   }
 
@@ -896,16 +1017,91 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   }
 
   async function cmdReset(args: string[], cwd: string): Promise<ExecResult> {
-    // Only the unstage form (a mixed reset against HEAD) exists for now; the
-    // history-moving forms land with their own scenarios.
-    const flag = args.find((a) => a.startsWith('-') && a !== '--')
-    if (flag) {
-      return fail(`sharpen: 'git reset ${flag}' is not available in this arena (yet)\n`, 1)
+    // Unstage form (no mode flag), plus --soft / --hard over history.
+    // Mixed reset against a commit is not in this arena yet.
+    let mode: 'soft' | 'hard' | 'unstage' = 'unstage'
+    const positional: string[] = []
+    for (const a of args) {
+      if (a === '--soft') {
+        mode = 'soft'
+        continue
+      }
+      if (a === '--hard') {
+        mode = 'hard'
+        continue
+      }
+      if (a === '--mixed') {
+        return fail(`sharpen: 'git reset --mixed' is not available in this arena (yet)\n`, 1)
+      }
+      if (a.startsWith('-') && a !== '--') {
+        return fail(`sharpen: 'git reset ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      if (a !== '--') positional.push(a)
     }
-    let paths = args.filter((a) => a !== '--' && !a.startsWith('-'))
+
+    if (mode === 'soft' || mode === 'hard') {
+      const targetSpec = positional[0] ?? 'HEAD'
+      if (positional.length > 1) {
+        return fail('fatal: Cannot do ' + mode + ' reset with paths.\n', 128)
+      }
+      const targetOid = await resolveRevision(targetSpec)
+      if (!targetOid) {
+        return fail(`fatal: ambiguous argument '${targetSpec}': unknown revision or path not in the working tree.\n`, 128)
+      }
+      const branch = await currentBranch()
+      if (!branch) {
+        return fail('fatal: reset requires a branch tip (detached HEAD is not supported here yet)\n', 128)
+      }
+      let oldOid: string
+      try {
+        oldOid = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+      } catch {
+        return fail('fatal: ambiguous argument \'HEAD\': unknown revision or path not in the working tree.\n', 128)
+      }
+      await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: targetOid, force: true })
+      if (mode === 'hard') {
+        // Explicitly destructive: reset index+worktree to the tip. Checkout by
+        // branch name (not oid) so isomorphic-git does not detach HEAD.
+        await git.checkout({ fs, dir, ref: branch, force: true })
+      }
+      // Soft path never touches checkout; always re-assert symbolic HEAD.
+      await git.writeRef({
+        fs,
+        dir,
+        ref: 'HEAD',
+        value: `refs/heads/${branch}`,
+        symbolic: true,
+        force: true,
+      })
+      const when = clock()
+      await appendReflog(jbFs, dir, {
+        oldOid,
+        newOid: targetOid,
+        author: { ...PLAYER, ...when },
+        message: `reset: moving to ${targetSpec}`,
+        branch,
+      })
+      if (mode === 'hard') {
+        let subject = targetOid.slice(0, 7)
+        try {
+          const c = await git.readCommit({ fs, dir, oid: targetOid })
+          subject = `${shortOid(targetOid)} ${c.commit.message.split('\n')[0]}`
+        } catch {
+          /* keep short oid */
+        }
+        return ok(`HEAD is now at ${subject}\n`)
+      }
+      return ok()
+    }
+
+    // Unstage form (mixed against HEAD for paths / whole index).
+    let paths = positional
     if (paths[0] === 'HEAD') paths = paths.slice(1)
-    if (paths[0] && /^HEAD[~^@]/.test(paths[0])) {
-      return fail(`sharpen: 'git reset ${paths[0]}' is not available in this arena (yet)\n`, 1)
+    if (paths[0] && (/^HEAD[~^]/.test(paths[0]) || /^HEAD@\{/.test(paths[0]))) {
+      return fail(
+        `sharpen: 'git reset ${paths[0]}' without --soft/--hard is not available in this arena (yet)\n`,
+        1
+      )
     }
     let matrix = await statusMatrix()
     let targets: StatusRow[]
@@ -933,7 +1129,6 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
         await git.resetIndex({ fs, dir, filepath: row[0] })
       }
     }
-    // Real git then reports what remains unstaged: tracked changes only.
     matrix = await statusMatrix()
     const remaining = matrix
       .map((row) => ({ file: row[0], c: classifyRow(row) }))
@@ -942,13 +1137,37 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
     return ok(remaining.length ? `Unstaged changes after reset:\n${remaining.join('\n')}\n` : '')
   }
 
+  async function cmdReflog(args: string[]): Promise<ExecResult> {
+    let limit: number | undefined
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i]!
+      if (a === '-n') {
+        if (args[i + 1] === undefined || args[i + 1]!.startsWith('-')) return switchRequiresValue('n')
+        limit = Number(args[i + 1])
+        i += 1
+        continue
+      }
+      if (/^-\d+$/.test(a)) {
+        limit = Number(a.slice(1))
+        continue
+      }
+      if (a.startsWith('-')) {
+        return fail(`sharpen: 'git reflog ${a}' is not available in this arena (yet)\n`, 1)
+      }
+      return fail(`sharpen: 'git reflog' with a ref argument is not available in this arena (yet)\n`, 1)
+    }
+    const entries = await readReflog(jbFs, dir, 'HEAD')
+    return ok(formatReflog(entries, limit))
+  }
+
   function cmdHelp(): ExecResult {
     return ok(
       'sharpen arena git: supported commands:\n' +
-        '  status [-s|--short]      add <path>|-A          commit -m <msg> [-a]\n' +
+        '  status [-s|--short]      add <path>|-A          commit -m <msg> [-a] [--amend]\n' +
         '  log [--oneline] [-n N]   branch [--list|-d]     checkout <branch>|-b|-- <path>\n' +
         '  switch <branch>|-c       restore [--staged]     clean [-n|-f] [-d]\n' +
-        '  rm [--cached] <path>     reset [HEAD] [<path>]  diff [--staged] [<path>]\n' +
+        '  rm [--cached] <path>     reset [--soft|--hard]  diff [--staged] [<path>]\n' +
+        '  reflog [-n N]\n' +
         "git <command> --help shows what each one supports in this arena.\n" +
         'Anything else is real git, but not available in this arena (yet).\n'
     )
@@ -960,7 +1179,10 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
   const HELP_CARDS: Record<string, { what: string; usage: string }> = {
     status: { what: 'where every file stands: staged, modified, untracked', usage: 'git status [-s|--short]' },
     add: { what: 'stage changes (deletions included) for the next commit', usage: 'git add <path>... | git add -A' },
-    commit: { what: 'record what is staged as a new commit', usage: 'git commit -m <msg> [-a] | git commit -am <msg>' },
+    commit: {
+      what: 'record what is staged; --amend replaces HEAD instead of adding a commit',
+      usage: 'git commit -m <msg> [-a] | git commit -am <msg> | git commit --amend -m <msg>|--no-edit',
+    },
     log: { what: 'walk the commit history from HEAD', usage: 'git log [--oneline] [-n <N>]' },
     branch: { what: 'list, create or delete branches', usage: 'git branch [<name>] | git branch -d|-D <name>' },
     checkout: { what: 'switch branches or restore paths (the older spelling)', usage: 'git checkout <branch> | git checkout -b <name> | git checkout -- <path>...' },
@@ -968,8 +1190,12 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
     restore: { what: 'put working-tree files back; --staged resets index entries instead', usage: 'git restore <path>... | git restore --staged <path>...' },
     clean: { what: 'delete untracked files (refuses without force, like real git)', usage: 'git clean [-n] [-f] [-d]' },
     rm: { what: 'remove files and stage the deletion; --cached keeps the file on disk, -f overrides the safety refusals', usage: 'git rm [--cached|-f] <path>...' },
-    reset: { what: 'unstage: reset index entries back to HEAD', usage: 'git reset [HEAD] [<path>...]' },
+    reset: {
+      what: 'unstage paths, or move the branch tip (--soft keeps index/worktree; --hard overwrites both)',
+      usage: 'git reset [<path>...] | git reset --soft|--hard <commit>|HEAD~|HEAD@{n}',
+    },
     diff: { what: 'what changed: worktree vs index; --staged compares index vs HEAD', usage: 'git diff [--staged|--cached] [<path>...]' },
+    reflog: { what: 'the time machine: every recent HEAD move, newest first', usage: 'git reflog [-n <N>]' },
     init: { what: 'start a repository (this arena repo already is one)', usage: 'git init' },
   }
 
@@ -1022,6 +1248,8 @@ export function createGitCommand({ gitFs, jbFs, dir, clock }: GitCommandDeps): C
           return await cmdReset(rest, ctx.cwd)
         case 'diff':
           return await cmdDiff(rest, ctx.cwd)
+        case 'reflog':
+          return await cmdReflog(rest)
         case 'init':
           return fail('fatal: this arena repo is already initialized\n', 128)
         default:

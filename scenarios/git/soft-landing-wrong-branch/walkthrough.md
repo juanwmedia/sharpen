@@ -1,0 +1,1 @@
+`git reset --soft HEAD~` moves the `release` tip back one commit but leaves the banner changes staged. Switch to `feature/promo-banner` (the staged work travels) and commit again. Soft reset is the right tool when the commit landed on the wrong branch and you still want that tree as your next commit elsewhere. Hard reset would throw the work away.

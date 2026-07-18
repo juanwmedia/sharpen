@@ -202,14 +202,62 @@ describe('git porcelain', () => {
     expect(status).toContain(' M src/api/client.ts')
   })
 
-  it('reset refuses the history-moving forms honestly', async () => {
+  it('commit --amend --no-edit folds staged changes into HEAD', async () => {
     const arena = await freshArena()
-    const hard = await arena.exec('git reset --hard')
-    expect(hard.exitCode).toBe(1)
-    expect(strip(hard.stderr)).toContain("'git reset --hard' is not available in this arena (yet)")
+    await arena.exec('git add src/api/client.ts')
+    await arena.exec('git commit -m "wip"')
+    await arena.jbFs.writeFile(`${arena.dir}/src/api/client.ts`, 'export const FIXED = 1\n')
+    await arena.exec('git add src/api/client.ts')
+    const r = await arena.exec('git commit --amend --no-edit')
+    expect(r.exitCode).toBe(0)
+    expect(strip(r.stdout)).toContain('wip')
+    const log = strip((await arena.exec('git log --oneline')).stdout).trim().split('\n')
+    expect(log[0]).toContain('wip')
+    expect(log).toHaveLength(3)
+    expect(await arena.jbFs.readFile(`${arena.dir}/src/api/client.ts`, 'utf8')).toBe(
+      'export const FIXED = 1\n'
+    )
+  })
+
+  it('reset --soft HEAD~ keeps changes staged; --hard rewinds the tree', async () => {
+    const arena = await freshArena()
+    await arena.exec('git add src/api/client.ts')
+    await arena.exec('git commit -m "keep me staged"')
+    const soft = await arena.exec('git reset --soft HEAD~')
+    expect(soft.exitCode).toBe(0)
+    const afterSoft = strip((await arena.exec('git status --short')).stdout)
+    expect(afterSoft).toMatch(/M\s+src\/api\/client\.ts/)
+    await arena.exec('git commit -m "keep me staged"')
+    const hard = await arena.exec('git reset --hard HEAD~')
+    expect(hard.exitCode).toBe(0)
+    expect(strip(hard.stdout)).toContain('HEAD is now at')
+    const afterHard = strip((await arena.exec('git status --short')).stdout)
+    expect(afterHard).not.toContain('src/api/client.ts')
+  })
+
+  it('reflog lists HEAD moves and reset HEAD@{n} restores a tip', async () => {
+    const arena = await freshArena()
+    await arena.exec('git add src/api/client.ts')
+    await arena.exec('git commit -m "precious"')
+    await arena.exec('git reset --hard HEAD~')
+    const reflog = strip((await arena.exec('git reflog')).stdout)
+    expect(reflog).toContain('HEAD@{0}:')
+    expect(reflog).toContain('reset: moving to HEAD~')
+    expect(reflog).toContain('precious')
+    // Quote HEAD@{n}: bash brace-expands the unquoted form.
+    const back = await arena.exec("git reset --hard 'HEAD@{1}'")
+    expect(back.exitCode).toBe(0)
+    const log = strip((await arena.exec('git log --oneline')).stdout)
+    expect(log).toContain('precious')
+  })
+
+  it('mixed reset against a commit stays unavailable', async () => {
+    const arena = await freshArena()
     const back = await arena.exec('git reset HEAD~1')
     expect(back.exitCode).toBe(1)
-    expect(strip(back.stderr)).toContain("'git reset HEAD~1' is not available in this arena (yet)")
+    expect(strip(back.stderr)).toContain(
+      "'git reset HEAD~1' without --soft/--hard is not available in this arena (yet)"
+    )
   })
 
   it('diff shows unstaged tracked changes only; once staged it goes quiet and --staged takes over', async () => {

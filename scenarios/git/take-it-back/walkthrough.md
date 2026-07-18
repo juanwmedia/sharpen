@@ -1,0 +1,1 @@
+The committed copy is still in HEAD; only the working tree went sideways. Point the file back at that version with `git restore src/welcome.ts` (or the older `git checkout -- src/welcome.ts`). Do not commit the joke "as a fix," and do not reset the branch tip: history is already fine. Any route that leaves `welcome.ts` byte-identical to HEAD passes.

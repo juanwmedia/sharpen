@@ -1,0 +1,1 @@
+Stage the missing receipt, then amend the tip you already made: `git add receipt.md` and `git commit --amend --no-edit`. Amend replaces HEAD instead of stacking a second commit, so `main` stays at one commit with both files. A fresh `-m` message is fine too if you want to rewrite the subject; the arena checks the resulting tree and commit count, not the exact wording.

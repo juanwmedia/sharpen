@@ -1,0 +1,45 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/welcome.ts
+      content: &welcome |
+        export const EMPTY_STATE = 'No projects yet. Create one to get started.'
+  - add: [src/welcome.ts]
+  - commit: 'feat: onboarding empty state'
+
+  # The doodle: a joke that must not ship.
+  - write:
+      path: src/welcome.ts
+      content: |
+        export const EMPTY_STATE = 'No projects yet. Panic is free.'
+
+checks:
+  - name:
+      en: welcome.ts matches the committed copy
+      es: welcome.ts coincide con el copy commiteado
+    expect:
+      file:
+        path: src/welcome.ts
+        status: unmodified
+        contentEquals: *welcome
+
+  - name:
+      en: History untouched on main
+      es: Historial intacto en main
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git restore src/welcome.ts

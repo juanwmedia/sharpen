@@ -1,0 +1,56 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/ledger.ts
+      content: |
+        export function balance(): number {
+          return 0
+        }
+  - add: [src/ledger.ts]
+  - commit: 'feat: ledger shell'
+
+  - write:
+      path: src/ledger.ts
+      content: &ledger |
+        export function balance(entries: number[]): number {
+          return entries.reduce((sum, n) => sum + n, 0)
+        }
+  - add: [src/ledger.ts]
+  - commit: 'refactor: sum ledger entries'
+
+  # Player starts after the slip: tip is gone, reflog still has it.
+  - reset:
+      mode: hard
+      to: HEAD~
+
+checks:
+  - name:
+      en: HEAD is main with the refactor tip restored
+      es: HEAD es main con el tip del refactor restaurado
+    expect:
+      head:
+        branch: main
+        commits: 2
+
+  - name:
+      en: Ledger file is the refactor, clean
+      es: El ledger es el refactor, limpio
+    expect:
+      file:
+        path: src/ledger.ts
+        status: unmodified
+        contentEquals: *ledger
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git reflog
+    - "git reset --hard 'HEAD@{1}'"

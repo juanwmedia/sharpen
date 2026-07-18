@@ -1,0 +1,62 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/tip.ts
+      content: &tip |
+        export function formatTip(cents: number): string {
+          return `$${(cents / 100).toFixed(2)} tip`
+        }
+  - add: [src/tip.ts]
+  - commit: 'feat: tip jar helper'
+
+  - write:
+      path: receipt.md
+      content: &receipt |
+        Thanks for the tip. Keep the change.
+
+checks:
+  - name:
+      en: Both files are committed and clean
+      es: Ambos archivos están commiteados y limpios
+    expect:
+      file:
+        path: receipt.md
+        status: unmodified
+        contentEquals: *receipt
+
+  - name:
+      en: Tip helper stayed in the tree
+      es: El helper del tip sigue en el árbol
+    expect:
+      file:
+        path: src/tip.ts
+        status: unmodified
+        contentEquals: *tip
+
+  - name:
+      en: Still a single commit on main
+      es: Sigue habiendo un solo commit en main
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+  - name:
+      en: Nothing left untracked
+      es: No queda nada sin seguimiento
+    expect:
+      untracked: none
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git add receipt.md
+    - git commit --amend --no-edit
