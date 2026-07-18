@@ -1,4 +1,4 @@
-import type { Locale } from '../../engine/types.ts'
+import type { Locale, Localized } from '../../engine/types.ts'
 
 /** Discriminator for which assembler understands setup/assert/spec. */
 export type ScenarioKind = 'git'
@@ -10,7 +10,7 @@ export interface ScenarioManifest {
   id: string
   kind: ScenarioKind
   pack: string
-  title: string
+  title: Localized
   difficulty: 'easy' | 'medium' | 'hard'
   timeLimitMs?: number
   themes?: string[]

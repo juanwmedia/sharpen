@@ -52,6 +52,9 @@ export interface Check {
 export interface Verdict {
   pass: boolean
   checks: Check[]
+  /** Names of failing checks whose required content git can no longer
+   * produce (destroyed uncommitted work). Conservative: empty on any doubt. */
+  lost: Localized[]
   stateHash: string
 }
 
@@ -92,7 +95,8 @@ export interface Scenario {
    * interprets the document and which logo the UI shows for the scenario. */
   kind: string
   pack: string
-  title: string
+  /** Bilingual display name. The public slug always derives from title.en. */
+  title: Localized
   difficulty: 'easy' | 'medium' | 'hard'
   timeLimitMs: number
   /** Situation narrative. No solving commands. */
@@ -111,6 +115,9 @@ export interface Scenario {
   solution: string[]
   setup(env: ScenarioSetupEnv): Promise<void>
   assert(ctx: ScenarioAssertContext): Promise<{ pass: boolean; checks: Check[] }>
+  /** Optional dead-end detector: names of failing checks whose required
+   * content git can no longer produce. Kinds implement it conservatively. */
+  lostChecks?(ctx: ScenarioAssertContext): Promise<Localized[]>
 }
 
 export type ScenarioSummary = Pick<

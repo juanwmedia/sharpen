@@ -14,6 +14,7 @@ import {
 import type {
   Arena,
   Check,
+  Localized,
   ScenarioSummary,
   MentorBubble,
   MentorErrorKind,
@@ -31,7 +32,7 @@ import {
   RUN_MODE_STORAGE_KEY,
   SHELL_COMMANDS,
 } from '@/shared/config/index.ts'
-import { currentLocale, t } from '@/shared/i18n/index.ts'
+import { currentLocale, lt, t } from '@/shared/i18n/index.ts'
 import { ansi, CRLF } from '@/shared/lib/ansi.ts'
 import { nudgePrefs } from './nudges.ts'
 import { MENTOR_ROLE, RUN_STATUS } from './types.ts'
@@ -70,6 +71,7 @@ const state = reactive<GameState>({
   engineVersion: '',
   updateAvailable: null,
   scenarios: [],
+  completed: [],
   mode: storedRunMode(),
   scenario: null,
   runId: null,
@@ -102,6 +104,19 @@ let mentorTurns = 0
 let learnSaveTimer: ReturnType<typeof setTimeout> | null = null
 /** Replay into the terminal once the writer is registered. */
 let pendingTerminalReplay: LearnTranscriptEntry[] | null = null
+/** Lost-check names already announced in the terminal (once per run). */
+let lostAnnounced = new Set<string>()
+
+/** A red terminal line, once per check: the state a check needs is gone and
+ * git cannot recover it. Learn points at Wipe progress; challenge is blunt. */
+function announceLost(lost: readonly Localized[] | undefined): void {
+  for (const name of lost ?? []) {
+    if (lostAnnounced.has(name.en)) continue
+    lostAnnounced.add(name.en)
+    const key = state.mode === 'challenge' ? 'terminal.lostChallenge' : 'terminal.lostLearn'
+    termWrite(ansi.red(t(key, { check: lt(name) })) + CRLF)
+  }
+}
 
 /** Server error kinds mapped to localized bubbles (see server/mentor.ts). */
 const MENTOR_ERROR_KEYS: Record<MentorErrorKind, string> = {
@@ -169,6 +184,7 @@ async function boot(): Promise<void> {
   state.engineVersion = meta.engineVersion
   state.updateAvailable = meta.updateAvailable ?? null
   state.scenarios = await getJson<ScenarioSummary[]>(apiRoutes.scenarios)
+  state.completed = (await getJson<{ completed: string[] }>(apiRoutes.progress)).completed
 }
 
 function learnPersistStatus(): LearnSnapshot['status'] | null {
@@ -233,6 +249,7 @@ function resetClientRunFields(): void {
   events?.close()
   events = null
   arena = null
+  lostAnnounced = new Set<string>()
   state.runId = null
   state.branch = ARENA_DEFAULT_BRANCH
   state.checks = null
@@ -294,6 +311,10 @@ async function startRun(scenarioId: string): Promise<void> {
     pendingTerminalReplay = snapshot.transcript.map((t) => ({ ...t }))
   }
 
+  // The terminal has not mounted yet (it appears when the briefing closes),
+  // so the first prompt paints with the real starting branch.
+  await syncBranch()
+
   if (state.mode === 'challenge') {
     state.status = RUN_STATUS.countdown
     for (const step of COUNTDOWN_STEPS) {
@@ -324,6 +345,8 @@ async function refreshChecks(): Promise<void> {
   if (!arena) return
   const verdict = await arena.verdict()
   state.checks = verdict.checks
+  // A restored run may already be dead; say so on entry, not on first Enter.
+  announceLost(verdict.lost)
 }
 
 // Called when the arena page unmounts (back button, browser back, run lost):
@@ -368,14 +391,33 @@ async function wipeLearn(): Promise<void> {
 
 // ---------- terminal integration -------------------------------------------
 
-export async function execCommand(command: string): Promise<ExecResult> {
-  if (!arena) throw new Error('arena not ready')
-  const result = await arena.exec(command)
-  state.branch =
+/** The prompt is written into the terminal as plain text, so branch changes
+ * that happen outside the shell's own paint cycle (arena boot on a non-main
+ * branch) must ask the shell to repaint its line. */
+let promptRefresh: () => void = () => {}
+export function registerPromptRefresher(fn: (() => void) | null): void {
+  promptRefresh = fn ?? (() => {})
+}
+
+/** Mirror the arena's current branch into the prompt state. Needed at arena
+ * creation too: scenarios may start on a branch other than main. */
+async function syncBranch(): Promise<void> {
+  if (!arena) return
+  const branch =
     (await arena.git
       // GitFs deliberately hides isomorphic-git's named keys (see types.ts).
       .currentBranch({ fs: arena.gitFs as unknown as FsClient, dir: arena.dir, fullname: false })
       .catch(() => null)) ?? DETACHED_HEAD_LABEL
+  if (branch !== state.branch) {
+    state.branch = branch
+    promptRefresh()
+  }
+}
+
+export async function execCommand(command: string): Promise<ExecResult> {
+  if (!arena) throw new Error('arena not ready')
+  const result = await arena.exec(command)
+  await syncBranch()
   return result
 }
 
@@ -438,12 +480,22 @@ export async function submit({ quiet = false }: { quiet?: boolean } = {}): Promi
     pendingCommandBubble = null
     return
   }
-  const verdict = (await res.json()) as { pass: boolean; checks: Check[]; nudged?: boolean }
+  const verdict = (await res.json()) as {
+    pass: boolean
+    checks: Check[]
+    nudged?: boolean
+    lost?: Localized[]
+  }
   state.checks = verdict.checks
   if (verdict.nudged) flushCommandBubble()
   else pendingCommandBubble = null
   if (verdict.pass) {
     state.status = RUN_STATUS.passed
+    // The picker paints solved scenarios; keep the local mirror in sync so
+    // going back does not need a refetch.
+    if (state.scenario && !state.completed.includes(state.scenario.id)) {
+      state.completed.push(state.scenario.id)
+    }
     termWrite(ansi.green(t('terminal.solved')) + CRLF)
     scheduleLearnSave()
   } else {
@@ -453,6 +505,7 @@ export async function submit({ quiet = false }: { quiet?: boolean } = {}): Promi
         ? ansi.dim(t('terminal.notYetQuiet', { green, total: verdict.checks.length })) + CRLF
         : ansi.red(t('terminal.notYetLoud')) + CRLF
     )
+    announceLost(verdict.lost)
   }
 }
 

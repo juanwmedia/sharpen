@@ -13,10 +13,10 @@ describe('scenario slugs', () => {
   })
 
   it('resolves every registered scenario by pack and slug, with no collisions', () => {
-    const keys = scenarios.map((c) => `${c.pack}/${slugify(c.title)}`)
+    const keys = scenarios.map((c) => `${c.pack}/${slugify(c.title.en)}`)
     expect(new Set(keys).size).toBe(scenarios.length)
     for (const scenario of scenarios) {
-      const slug = slugify(scenario.title)
+      const slug = slugify(scenario.title.en)
       expect(getScenarioBySlug(slug)).toBe(scenario)
       expect(getScenarioByPackSlug(scenario.pack, slug)).toBe(scenario)
       expect(getScenarioByPackSlug('nope', slug)).toBeUndefined()

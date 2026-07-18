@@ -13,6 +13,7 @@ import { TerminalPane } from '@/widgets/terminal-pane/index.ts'
 import { TimerRing } from '@/widgets/run-timer/index.ts'
 import { VerdictPanel } from '@/widgets/verdict-panel/index.ts'
 import { DEFAULT_TIME_LIMIT_MS, ROUTE_NAMES, SWAP_SHORTCUT_CODES } from '@/shared/config/index.ts'
+import { lt } from '@/shared/i18n/index.ts'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -89,7 +90,7 @@ const terminalPinned = ref(true)
           >
             ←
           </button>
-          <h2 class="m-0 font-mono text-[19px] tracking-[-0.02em]">{{ state.scenario.title }}</h2>
+          <h2 class="m-0 font-mono text-[19px] tracking-[-0.02em]">{{ lt(state.scenario.title) }}</h2>
           <Chip>{{ t(`difficulty.${state.scenario.difficulty}`) }}</Chip>
         </div>
         <ScenarioBriefing
@@ -155,7 +156,7 @@ const terminalPinned = ref(true)
     <BriefingModal
       v-if="state.scenario"
       :open="inBriefing"
-      :title="state.scenario.title"
+      :title="lt(state.scenario.title)"
       :difficulty="t(`difficulty.${state.scenario.difficulty}`)"
       @start="onBriefingStart"
       @cancel="backToPicker"

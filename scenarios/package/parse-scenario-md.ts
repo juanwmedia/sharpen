@@ -28,7 +28,7 @@ function parseManifest(raw: unknown): ScenarioManifest {
   if (typeof data.version !== 'number' || !Number.isInteger(data.version) || data.version < 1) {
     throw new Error('scenario.md: version must be a positive integer (bump it on any published change)')
   }
-  for (const key of ['id', 'kind', 'pack', 'title', 'difficulty'] as const) {
+  for (const key of ['id', 'kind', 'pack', 'difficulty'] as const) {
     if (typeof data[key] !== 'string' || !(data[key] as string).trim()) {
       throw new Error(`scenario.md: missing or invalid "${key}"`)
     }
@@ -42,6 +42,20 @@ function parseManifest(raw: unknown): ScenarioManifest {
   const difficulty = data.difficulty as string
   if (difficulty !== 'easy' && difficulty !== 'medium' && difficulty !== 'hard') {
     throw new Error(`scenario.md: invalid difficulty "${difficulty}"`)
+  }
+
+  // Bilingual like briefing/objective; the slug keeps deriving from title.en.
+  const rawTitle = data.title as Record<string, unknown> | null | undefined
+  if (!rawTitle || typeof rawTitle !== 'object' || Array.isArray(rawTitle)) {
+    throw new Error('scenario.md: title must be localized, e.g. { en: ..., es: ... }')
+  }
+  const title = emptyLocalized()
+  for (const locale of LOCALES) {
+    const value = rawTitle[locale]
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error(`scenario.md: missing or invalid "title.${locale}"`)
+    }
+    title[locale] = value.trim()
   }
 
   let timeLimitMs: number | undefined
@@ -74,7 +88,7 @@ function parseManifest(raw: unknown): ScenarioManifest {
     id: (data.id as string).trim(),
     kind: kind as ScenarioKind,
     pack: (data.pack as string).trim(),
-    title: (data.title as string).trim(),
+    title,
     difficulty,
     ...(timeLimitMs !== undefined ? { timeLimitMs } : {}),
     ...(themes !== undefined ? { themes } : {}),

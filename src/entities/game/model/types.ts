@@ -37,6 +37,8 @@ export interface GameState {
   /** Newer published version, when the server's boot check found one. */
   updateAvailable: string | null
   scenarios: ScenarioSummary[]
+  /** Scenario ids the player already solved (learn pass or challenge pass). */
+  completed: string[]
   /** Preferred mode for the next run; persisted in localStorage. */
   mode: RunMode
   scenario: Scenario | null

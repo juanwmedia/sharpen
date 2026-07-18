@@ -36,11 +36,34 @@ skills/       The Claude Code plugin skill that boots the arena.
   replay is the only authority; the browser verdict is a preview.
 - **State-based validation.** `assert` inspects the snapshot (refs, index,
   working tree), NEVER the typed commands. Any correct solution must pass.
+  Verdicts also carry `lost`: failing contentEquals checks whose required
+  content git can no longer produce (not on disk, no blob in the odb), i.e.
+  the player destroyed uncommitted work. Conservative by design: silent on
+  any doubt. The web prints a red terminal line once per lost check (learn
+  points at Wipe progress) and the mentor prompt is told to stop nudging
+  toward dead checks. Detector lives in kinds/git.ts (buildLostChecks);
+  evidence files do NOT record it.
+- **Git never destroys silently.** Real git's sacred rule binds every
+  porcelain path that touches the worktree or index: uncommitted work either
+  travels with the operation or the command refuses exactly like real git;
+  it is NEVER lost as a side effect. Only explicitly destructive commands
+  (clean -f, restore, rm -f, reset --hard) may delete work. isomorphic-git's
+  checkout() resets index+worktree to the target tree and MUST NOT be used
+  for branch switching (see switchBranch; incident 2026-07-18: it silently
+  deleted a player's staged file and the mentor rationalized it as git).
+  When semantics are in doubt, probe real git first (LC_ALL=C) and record
+  the finding in docs/api-notes.md. The mentor prompt carries the matching
+  guardrail: real git is the only authority; anomalies are arena bugs,
+  never lessons.
 - **Faithful porcelain.** Implemented: status, add, commit, log, branch,
-  checkout, switch, restore, clean, rm. Output and refusals mirror real git
+  checkout, switch, restore, clean, rm, reset (unstage form only), diff
+  (unstaged + --staged). Output and refusals mirror real git
   (e.g. `clean` without `-f` refuses exactly like git). Unimplemented
   subcommands answer `sharpen: 'git X' is not available in this arena (yet)`.
   Porcelain output is NEVER translated: git speaks English.
+  README's "Current limitations" section is a living contract: any change to
+  the porcelain (command added, flag added, gap closed) updates that section
+  and cmdHelp's list in the same change.
 - **Evidence.** Schema v1 in `engine/types.ts`; files in
   `~/.sharpen/evidence/`. Scoring: `max(10, 100 - seconds)`, fail/timeout 0.
   Do not change evidence shape or scoring casually: v2's shared ranking
@@ -91,8 +114,11 @@ skills/       The Claude Code plugin skill that boots the arena.
   `Localized = Record<Locale, string>`, the author writes every language and
   TypeScript enforces completeness. English is canonical: mentor prompts and
   evidence always use `.en`. The web picks with `lt()` from `@/shared/i18n`.
-- Titles and slugs stay English. The mentor answers in the run's locale via
-  `LANGUAGE_RULES` in `server/mentor.ts` (locale travels in POST /api/runs).
+- Titles are bilingual (`Localized`, Spanish written with its own punch, not
+  a literal translation); slugs stay English, always derived from `title.en`
+  (one public URL across languages). The mentor answers in the run's locale
+  via `LANGUAGE_RULES` in `server/mentor.ts` (locale travels in POST
+  /api/runs) and receives `title.en`.
 
 ## Frontend conventions (src/)
 
@@ -139,7 +165,7 @@ vocabulary, boilerplate, checklist). Canonical example:
    `scenario.md`, `scenario.yaml`, `walkthrough.md` (keep `index.ts`).
 2. `scenario.yaml` declares setup as steps (ops mirror ScenarioSetupEnv:
    write/remove/add/commit/branch/checkout), checks as predicates
-   (untracked/staged/head/file) and `solution.commands` (canonical solving
+   (untracked/staged/head/branch/file) and `solution.commands` (canonical solving
    commands, never shown to the player). The engine interprets the document:
    deterministic by construction, and the interpreter IS the validator
    (unknown vocabulary fails to load naming what is missing).

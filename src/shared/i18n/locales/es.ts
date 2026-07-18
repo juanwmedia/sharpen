@@ -18,6 +18,7 @@ export default {
   picker: {
     eyebrow: 'pack de git',
     title: 'Elige tu escenario',
+    done: 'Hecho',
     ledeLearn:
       'Sin reloj, un repo real en tu navegador y un mentor socrático observando. Cada {enter} valida: ejecuta un comando y la arena juzga el estado del repo que deja detrás. Desvela la solución cuando quieras el walkthrough.',
     ledeChallenge:
@@ -45,6 +46,10 @@ export default {
     // {'@'} escapes the bare @, which intlify parses as a linked message.
     title: "you{'@'}sharpen · /repo",
     hint: 'cada {enter} valida',
+    lostLearn:
+      '✗ "{check}": el trabajo sin commitear que necesita este check fue destruido; git no puede recuperarlo. Borra el progreso y vuelve a intentarlo.',
+    lostChallenge:
+      '✗ "{check}": ese trabajo sin commitear se perdió para siempre; esta run ya no puede ponerse en verde. Así es git.',
     pin: 'Fijar el terminal (siempre visible)',
     unpin: 'Soltar el terminal (se desplaza con la página)',
     solved: '✓ Escenario resuelto. La arena validó el estado de tu repo.',
@@ -59,7 +64,7 @@ export default {
   },
   chat: {
     eyebrow: 'conversación',
-    idle: 'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña.',
+    idle: 'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña. Los comandos viven en el terminal, donde `git <comando> --help` te dice qué soporta esta arena; esta caja es para los porqués.',
     placeholderLive: 'Pide un empujón…',
     placeholderFree: 'Pregunta lo que quieras al mentor…',
     send: 'Enviar',

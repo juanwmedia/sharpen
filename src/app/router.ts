@@ -12,11 +12,11 @@ function scenarioPath(pack: string, title: string): string {
 function redirectLegacySlug(to: { params: { slug?: string | string[] } }): string {
   const slug = String(to.params.slug ?? '')
   const scenario = getScenarioBySlug(slug)
-  return scenario ? scenarioPath(scenario.pack, scenario.title) : '/'
+  return scenario ? scenarioPath(scenario.pack, scenario.title.en) : '/'
 }
 
 // Public URLs are /:pack/:slug (e.g. /git/clean-sweep). Pack is the category
-// (git, typescript, …); slug comes from the title.
+// (git, typescript, …); slug comes from title.en: one URL across languages.
 export const router = createRouter({
   history: createWebHistory(),
   routes: [

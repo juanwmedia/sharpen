@@ -5,16 +5,17 @@ import { slugify } from '@scenarios/slug.ts'
 import { useGame } from '@/entities/game/index.ts'
 import { KIND_LOGOS, ROUTE_NAMES } from '@/shared/config/index.ts'
 import { lt } from '@/shared/i18n/index.ts'
-import { Eyebrow } from '@/shared/ui/index.ts'
+import { INLINE_MD_CLASS, renderInlineMd } from '@/shared/lib/inline-md.ts'
+import { Chip, Eyebrow } from '@/shared/ui/index.ts'
 
 const { t } = useI18n()
 const router = useRouter()
 const { state } = useGame()
 
-function enterArena(c: { pack: string; title: string }): void {
+function enterArena(c: { pack: string; title: { en: string } }): void {
   void router.push({
     name: ROUTE_NAMES.scenario,
-    params: { pack: c.pack, slug: slugify(c.title) },
+    params: { pack: c.pack, slug: slugify(c.title.en) },
   })
 }
 </script>
@@ -41,7 +42,8 @@ function enterArena(c: { pack: string; title: string }): void {
         >
           <div class="grid gap-2">
             <div class="flex items-baseline gap-3">
-              <h3 class="m-0 font-mono text-[17px]">{{ c.title }}</h3>
+              <h3 class="m-0 font-mono text-[17px]">{{ lt(c.title) }}</h3>
+              <Chip v-if="state.completed.includes(c.id)" tone="ok">✓ {{ t('picker.done') }}</Chip>
               <span class="font-mono text-[11px] tracking-[0.1em] uppercase text-faint">
                 {{
                   t('picker.meta', {
@@ -52,7 +54,10 @@ function enterArena(c: { pack: string; title: string }): void {
                 }}
               </span>
             </div>
-            <p class="m-0 text-sm text-muted">{{ lt(c.objective) }}</p>
+            <p
+              :class="`m-0 text-[15px] leading-relaxed text-muted ${INLINE_MD_CLASS}`"
+              v-html="renderInlineMd(lt(c.objective))"
+            ></p>
             <span class="mt-1 font-mono text-[12.5px] text-accent">{{ t('picker.enterArena') }}</span>
           </div>
           <img

@@ -274,7 +274,7 @@ describe('buildMentorPrompt', () => {
     })
     expect(prompt).toContain(MENTOR_PROMPT.openAttempt)
     expect(prompt).toContain(MENTOR_PROMPT.boardAuthoritative)
-    expect(prompt).toContain(cleanSweep.title)
+    expect(prompt).toContain(cleanSweep.title.en)
     expect(prompt).toContain(cleanSweep.objective.en.slice(0, 40))
     expect(prompt).toContain(MENTOR_PROMPT.repoBoard)
     expect(prompt).toContain('untracked: build.log')

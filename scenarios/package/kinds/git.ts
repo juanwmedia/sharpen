@@ -1,4 +1,5 @@
 import { parse as parseYaml } from 'yaml'
+import type { FsClient } from 'isomorphic-git'
 import {
   FILE_STATUS,
   statusOf,
@@ -125,12 +126,13 @@ function buildSetup(steps: SetupStep[]): (env: ScenarioSetupEnv) => Promise<void
 /** The predicate vocabulary. Authors write name + expect; the pass/fail
  * DETAIL is rendered here, once, in every language, so every scenario gets
  * consistent verdict copy for free. */
-const CHECK_PREDICATES = ['untracked', 'staged', 'head', 'file'] as const
+const CHECK_PREDICATES = ['untracked', 'staged', 'head', 'branch', 'file'] as const
 
 type CheckSpec =
   | { predicate: 'untracked' }
   | { predicate: 'staged' }
   | { predicate: 'head'; branch?: string; commits?: number }
+  | { predicate: 'branch'; name: string; commits?: number; absent?: true }
   | { predicate: 'file'; path: string; status?: FileStatus; contentEquals?: string }
 
 interface ScenarioCheck {
@@ -182,6 +184,30 @@ function parseCheckSpec(raw: unknown, at: string): CheckSpec {
         ...(branch !== undefined ? { branch } : {}),
         ...(commits !== undefined ? { commits } : {}),
       }
+    }
+    case 'branch': {
+      // Unlike head, this inspects ANY branch tip: it is how a scenario
+      // proves a protected branch (usually main) never moved, or that a
+      // deleted branch is really gone (absent: true).
+      const v = value as { name?: unknown; commits?: unknown; absent?: unknown } | null
+      if (!v || typeof v !== 'object' || typeof v.name !== 'string' || !v.name) {
+        throw new Error(`${at}: expect.branch needs { name, commits? | absent: true }`)
+      }
+      if (v.absent !== undefined) {
+        if (v.absent !== true) throw new Error(`${at}: expect.branch.absent only supports true`)
+        if (v.commits !== undefined) {
+          throw new Error(`${at}: expect.branch.absent excludes commits (a gone branch has no count)`)
+        }
+        return { predicate: 'branch', name: v.name, absent: true }
+      }
+      let commits: number | undefined
+      if (v.commits !== undefined) {
+        if (typeof v.commits !== 'number' || !Number.isInteger(v.commits) || v.commits < 0) {
+          throw new Error(`${at}: expect.branch.commits must be a non-negative integer`)
+        }
+        commits = v.commits
+      }
+      return { predicate: 'branch', name: v.name, ...(commits !== undefined ? { commits } : {}) }
     }
     case 'file': {
       const v = value as { path?: unknown; status?: unknown; contentEquals?: unknown } | null
@@ -256,18 +282,60 @@ async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): 
       const pass =
         (spec.branch === undefined || branch === spec.branch) &&
         (spec.commits === undefined || commits === spec.commits)
-      const expected = [
-        spec.branch !== undefined ? spec.branch : null,
-        spec.commits !== undefined ? `${spec.commits} commits` : null,
-      ]
-        .filter(Boolean)
-        .join(' with ')
+      // The expected fragment is composed per language: joining with an
+      // English connective leaked "with" into the Spanish detail.
+      const expectedParts = (join: string) =>
+        [
+          spec.branch !== undefined ? spec.branch : null,
+          spec.commits !== undefined ? `${spec.commits} commits` : null,
+        ]
+          .filter(Boolean)
+          .join(join)
       return {
         name: check.name,
         pass,
         detail: {
-          en: `HEAD is ${branch} with ${commits} commits (expected ${expected})`,
-          es: `HEAD es ${branch} con ${commits} commits (esperado ${expected})`,
+          en: `HEAD is ${branch} with ${commits} commits (expected ${expectedParts(' with ')})`,
+          es: `HEAD es ${branch} con ${commits} commits (esperado ${expectedParts(' con ')})`,
+        },
+      }
+    }
+    case 'branch': {
+      const tip = ctx.snapshot.branches[spec.name]
+      if (spec.absent) {
+        return {
+          name: check.name,
+          pass: !tip,
+          detail: tip
+            ? { en: `branch ${spec.name} still exists`, es: `la rama ${spec.name} todavía existe` }
+            : { en: `branch ${spec.name} is gone`, es: `la rama ${spec.name} ya no existe` },
+        }
+      }
+      if (!tip) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `branch ${spec.name} does not exist`,
+            es: `la rama ${spec.name} no existe`,
+          },
+        }
+      }
+      if (spec.commits === undefined) {
+        return {
+          name: check.name,
+          pass: true,
+          detail: { en: `branch ${spec.name} exists`, es: `la rama ${spec.name} existe` },
+        }
+      }
+      const fs = ctx.gitFs as unknown as FsClient
+      const commits = (await ctx.git.log({ fs, dir: ctx.dir, ref: spec.name })).length
+      return {
+        name: check.name,
+        pass: commits === spec.commits,
+        detail: {
+          en: `${spec.name} is at ${commits} commits (expected ${spec.commits})`,
+          es: `${spec.name} está en ${commits} commits (esperado ${spec.commits})`,
         },
       }
     }
@@ -303,6 +371,45 @@ async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): 
       const never: never = spec
       throw new Error(`unreachable predicate ${String(never)}`)
     }
+  }
+}
+
+/** Names of failing contentEquals checks whose required content git can no
+ * longer produce: not on disk at the path, and not a blob anywhere in the
+ * object database (index or any commit). Deliberately conservative: if the
+ * blob exists somewhere, stay silent. The player could always retype the
+ * content by hand, so the message wording is "git cannot bring it back",
+ * never "impossible". */
+function buildLostChecks(
+  checks: ScenarioCheck[]
+): (ctx: ScenarioAssertContext) => Promise<Localized[]> {
+  return async (ctx) => {
+    const lost: Localized[] = []
+    const fs = ctx.gitFs as unknown as FsClient
+    for (const check of checks) {
+      const { spec } = check
+      if (spec.predicate !== 'file' || spec.contentEquals === undefined) continue
+      const evaluated = await evaluateCheck(check, ctx)
+      if (evaluated.pass) continue
+      let reachable = false
+      try {
+        const current = await ctx.fs.readFile(`${ctx.dir}/${spec.path}`, 'utf8')
+        if (current === spec.contentEquals) reachable = true
+      } catch {
+        /* absent from the worktree */
+      }
+      if (!reachable) {
+        try {
+          const { oid } = await ctx.git.hashBlob({ object: spec.contentEquals })
+          await ctx.git.readBlob({ fs, dir: ctx.dir, oid })
+          reachable = true
+        } catch {
+          /* not in the object database either */
+        }
+      }
+      if (!reachable) lost.push(check.name)
+    }
+    return lost
   }
 }
 
@@ -390,5 +497,6 @@ export function assembleGitScenario(
     solution: mechanics.solution,
     setup: buildSetup(mechanics.setup),
     assert: buildAssert(mechanics.checks),
+    lostChecks: buildLostChecks(mechanics.checks),
   }
 }

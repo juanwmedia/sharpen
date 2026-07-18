@@ -1,5 +1,5 @@
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
@@ -105,6 +105,31 @@ export async function recordResult(evidence: Evidence): Promise<void> {
     date: new Date(evidence.submittedAt).toISOString(),
   })
   await writeFile(leaderboardPath, JSON.stringify(board, null, 2))
+}
+
+/** Scenario ids with at least one passing challenge run recorded on disk.
+ * Unreadable evidence files never block the picker: they are skipped. */
+export async function passedEvidenceIds(): Promise<string[]> {
+  let files: string[]
+  try {
+    files = await readdir(evidenceDir)
+  } catch {
+    return []
+  }
+  const ids = new Set<string>()
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue
+    try {
+      const raw = JSON.parse(await readFile(join(evidenceDir, file), 'utf8')) as {
+        challengeId?: unknown
+        pass?: unknown
+      }
+      if (raw.pass === true && typeof raw.challengeId === 'string') ids.add(raw.challengeId)
+    } catch {
+      /* skip */
+    }
+  }
+  return [...ids]
 }
 
 export async function leaderboard(): Promise<LeaderboardRow[]> {

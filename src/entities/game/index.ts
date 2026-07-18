@@ -2,6 +2,7 @@ export {
   execCommand,
   livePrompt,
   onCommand,
+  registerPromptRefresher,
   registerRunLostHandler,
   registerTerminalWriter,
   submit,

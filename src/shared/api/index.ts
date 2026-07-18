@@ -4,6 +4,7 @@
 export const apiRoutes = {
   meta: '/api/meta',
   scenarios: '/api/scenarios',
+  progress: '/api/progress',
   runs: '/api/runs',
   run: (id: string) => `/api/runs/${id}`,
   runEvents: (id: string) => `/api/runs/${id}/events`,

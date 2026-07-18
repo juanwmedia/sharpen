@@ -1,0 +1,78 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/invoice.ts
+      content: |
+        export function totalWithVat(net: number) {
+          return Math.round(net * 1.21)
+        }
+  - write:
+      path: TODO.md
+      content: |
+        # Team TODO
+
+        - audit invoice rounding
+  - add: [src/invoice.ts, TODO.md]
+  - commit: 'feat: invoicing module'
+
+  # The mixed tree: a real fix, a personal note, and repro junk.
+  - write:
+      path: src/invoice.ts
+      content: &fixed-invoice |
+        export function totalWithVat(net: number) {
+          return Math.round(net * 1.21 * 100) / 100
+        }
+  - write:
+      path: TODO.md
+      content: &edited-todo |
+        # Team TODO
+
+        - audit invoice rounding
+        - ask finance about the fee rounding rule
+  - write:
+      path: debug.log
+      content: |
+        invoice 1042 net=16.52 total=20 expected=19.99
+
+checks:
+  - name:
+      en: The rounding fix is committed
+      es: El fix de redondeo está commiteado
+    expect:
+      file:
+        path: src/invoice.ts
+        status: unmodified
+        contentEquals: *fixed-invoice
+
+  - name:
+      en: Exactly one new commit on main
+      es: Exactamente un commit nuevo en main
+    expect:
+      head:
+        branch: main
+        commits: 2
+
+  - name:
+      en: Your TODO edit stays local
+      es: Tu edición del TODO se queda en local
+    expect:
+      file:
+        path: TODO.md
+        status: modified
+        contentEquals: *edited-todo
+
+  - name:
+      en: The debug log stays out of the repo
+      es: El log de depuración queda fuera del repo
+    expect:
+      file:
+        path: debug.log
+        status: untracked
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git add src/invoice.ts
+    - "git commit -m 'fix: round invoice totals to cents'"

@@ -66,6 +66,15 @@ export class TermShell {
     this._write(this._prompt() + this._line)
   }
 
+  /** Redraw the prompt line in place: the prompt is plain text, so a state
+   * change behind it (e.g. the arena finished booting on another branch)
+   * needs an explicit repaint. Safe no-op mid-execution: the shell paints a
+   * fresh prompt after every command anyway. */
+  refreshPrompt(): void {
+    if (!this._write || this._busy || this._locked) return
+    this._write(`\r\x1b[K${this._prompt()}${this._line}`)
+  }
+
   async handleInput(data: string): Promise<void> {
     if (!this._write || this._busy || this._locked) return
     const write = this._write

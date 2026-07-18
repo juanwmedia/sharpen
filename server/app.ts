@@ -14,6 +14,7 @@ import {
   MENTOR_BUBBLE,
   RUN_MODES,
   type Check,
+  type Localized,
   type MentorBubble,
   type NudgePrefs,
   type Snapshot,
@@ -37,7 +38,7 @@ import {
 } from './mentor.ts'
 import { baselineOf, shouldNudge } from './nudge.ts'
 import { RUN_STATUS, RunStore, type Run, type TranscriptEntry } from './runs.ts'
-import { ENGINE_VERSION, leaderboard, recordResult, saveEvidence, slog } from './store.ts'
+import { ENGINE_VERSION, leaderboard, passedEvidenceIds, recordResult, saveEvidence, slog } from './store.ts'
 import { checkForUpdate } from './update-check.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -129,11 +130,13 @@ function mentorPromptFor(
     checks,
     playerQuestion,
     durationSec,
+    lostChecks,
   }: {
     snapshot: Snapshot
     checks: Check[]
     playerQuestion?: string
     durationSec?: number
+    lostChecks?: Localized[]
   }
 ): string {
   const open = run.status === RUN_STATUS.live || run.status === RUN_STATUS.ready
@@ -154,6 +157,7 @@ function mentorPromptFor(
     clockSec: open && run.deadline != null ? Math.max(0, (run.deadline - Date.now()) / 1000) : null,
     durationSec,
     playerQuestion,
+    lostChecks,
   })
 }
 
@@ -192,6 +196,19 @@ app.get('/api/meta', async (_req, res) => {
 
 app.get('/api/scenarios', (_req, res) => {
   res.json(scenarioSummaries())
+})
+
+// Player progress for the picker: a scenario counts as done when a learn
+// snapshot on disk says passed, or a challenge evidence records a pass.
+// Reveal does NOT count: seeing the solution is not solving it.
+app.get('/api/progress', async (_req, res) => {
+  const completed = new Set(await passedEvidenceIds())
+  for (const { id } of scenarioSummaries()) {
+    if (completed.has(id)) continue
+    const snapshot = await loadLearn(id)
+    if (snapshot?.status === 'passed') completed.add(id)
+  }
+  res.json({ completed: [...completed] })
 })
 
 app.get('/api/leaderboard', async (_req, res) => {
@@ -357,7 +374,11 @@ app.post('/api/runs/:id/submit', async (req, res) => {
   } else if (shouldNudge(run.nudgeBaseline, verdict, run.lastCommandErrored, nudgePrefsFrom(req.body))) {
     askMentor(
       run,
-      mentorPromptFor(run, MENTOR_TRIGGER.submitFail, { snapshot, checks: verdict.checks }),
+      mentorPromptFor(run, MENTOR_TRIGGER.submitFail, {
+        snapshot,
+        checks: verdict.checks,
+        lostChecks: verdict.lost,
+      }),
       { coalesce: true }
     )
   } else {
@@ -367,7 +388,7 @@ app.post('/api/runs/:id/submit', async (req, res) => {
   run.nudgeBaseline = baselineOf(verdict)
   run.lastCommandErrored = false
   slog(`run=${run.id} submit attempt=${run.attempts} pass=${verdict.pass}`)
-  res.json({ pass: verdict.pass, checks: verdict.checks, nudged })
+  res.json({ pass: verdict.pass, checks: verdict.checks, nudged, lost: verdict.lost })
 })
 
 // Chat: same Open/Closed context as other turns; trigger is chat.

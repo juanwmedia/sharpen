@@ -8,7 +8,14 @@ import {
   QUESTION_MAX_LENGTH,
   SWAP_SHORTCUT_LABEL,
 } from '@/shared/config/index.ts'
+import { INLINE_MD_CLASS, renderInlineMd } from '@/shared/lib/inline-md.ts'
 import { Eyebrow } from '@/shared/ui/index.ts'
+
+/** Roles whose text renders inline markdown (escaped first, so mentor output
+ * can never inject markup). Typed commands stay verbatim: they are quotes. */
+function rendersMd(role: MentorRole): boolean {
+  return role !== MENTOR_ROLE.youCmd && role !== MENTOR_ROLE.thinking
+}
 
 const props = defineProps<{
   feed: readonly MentorItem[]
@@ -85,14 +92,20 @@ function send(): void {
       class="grid gap-2.5 overflow-y-auto px-0.5 py-1"
       :style="{ maxHeight: `${CHAT_FEED_MAX_HEIGHT_PX}px` }"
     >
-      <p v-if="!feed.length" class="m-0 text-[13px] text-faint">{{ t('chat.idle') }}</p>
+      <p
+        v-if="!feed.length"
+        :class="`m-0 text-[15px] leading-relaxed text-muted ${INLINE_MD_CLASS}`"
+        v-html="renderInlineMd(t('chat.idle'))"
+      ></p>
       <div v-for="(item, i) in feed" :key="i" class="flex" :class="{ 'justify-end': isMine(item) }">
         <div
           class="max-w-[76%] rounded-panel px-[13px] py-[9px] text-[13.5px] whitespace-pre-wrap [overflow-wrap:anywhere]"
-          :class="BUBBLE_CLASS[item.role]"
+          :class="[BUBBLE_CLASS[item.role], INLINE_MD_CLASS]"
         >
-          <span v-if="item.role === MENTOR_ROLE.youCmd" class="mr-[7px] text-accent">➜</span>{{ item.text
-          }}<span v-if="item.meta" class="mt-1 block font-mono text-[11.5px] text-err">{{ item.meta }}</span>
+          <span v-if="item.role === MENTOR_ROLE.youCmd" class="mr-[7px] text-accent">➜</span
+          ><span v-if="rendersMd(item.role)" v-html="renderInlineMd(item.text)"></span
+          ><template v-else>{{ item.text }}</template
+          ><span v-if="item.meta" class="mt-1 block font-mono text-[11.5px] text-err">{{ item.meta }}</span>
         </div>
       </div>
     </div>

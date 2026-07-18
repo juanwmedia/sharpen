@@ -2,7 +2,15 @@
 import { WTerm } from '@wterm/dom'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { execCommand, livePrompt, onCommand, registerTerminalWriter, submit, tabCandidates } from '@/entities/game/index.ts'
+import {
+  execCommand,
+  livePrompt,
+  onCommand,
+  registerPromptRefresher,
+  registerTerminalWriter,
+  submit,
+  tabCandidates,
+} from '@/entities/game/index.ts'
 import { SWAP_SHORTCUT_LABEL, TERMINAL_COLS, TERMINAL_ROWS } from '@/shared/config/index.ts'
 import { TermShell } from '@/shared/lib/bash-shell.ts'
 
@@ -38,11 +46,15 @@ onMounted(async () => {
   term.onData = (data: string) => void shell.handleInput(data)
   shell.attach((data) => term?.write(data))
   registerTerminalWriter((data) => term?.write(data))
+  // The pane can mount before the arena finishes booting (learn mode has no
+  // briefing gate), so the store repaints the prompt when the branch lands.
+  registerPromptRefresher(() => shell.refreshPrompt())
   term.focus()
 })
 
 onBeforeUnmount(() => {
   registerTerminalWriter(() => {})
+  registerPromptRefresher(null)
   term?.destroy()
 })
 </script>

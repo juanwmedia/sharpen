@@ -47,7 +47,15 @@ export async function createArena(scenario: Scenario): Promise<Arena> {
       await jbFs.rm(join(dir, path), { recursive: true, force: true })
     },
     async add(...paths) {
-      for (const p of paths) await git.add({ fs, dir, filepath: p })
+      for (const p of paths) {
+        // Real git stages deletions too (`git add <gone-path>` records the
+        // removal); isomorphic-git splits that into add/remove, so mirror it.
+        if (await jbFs.exists(join(dir, p))) {
+          await git.add({ fs, dir, filepath: p })
+        } else {
+          await git.remove({ fs, dir, filepath: p })
+        }
+      }
     },
     async commit(message) {
       const author = { ...SETUP_AUTHOR, ...clock() }
@@ -98,8 +106,10 @@ export async function createArena(scenario: Scenario): Promise<Arena> {
     snapshot: () => takeSnapshot({ fs: gitFs, dir }),
     async verdict() {
       const snapshot = await takeSnapshot({ fs: gitFs, dir })
-      const result = await scenario.assert({ snapshot, fs: jbFs, gitFs, git, dir })
-      return { ...result, stateHash: await stateHash(snapshot) }
+      const ctx = { snapshot, fs: jbFs, gitFs, git, dir }
+      const result = await scenario.assert(ctx)
+      const lost = scenario.lostChecks ? await scenario.lostChecks(ctx) : []
+      return { ...result, lost, stateHash: await stateHash(snapshot) }
     },
   }
 }

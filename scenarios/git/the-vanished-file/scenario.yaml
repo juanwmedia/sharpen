@@ -1,0 +1,69 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: deploy.sh
+      content: &deploy-script |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        npm run build
+        rsync -az dist/ deploy@web-01:/srv/status-page
+  - write:
+      path: scripts/healthcheck.sh
+      content: &healthcheck |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        curl -fsS -m 5 https://status.example.com/health
+  - write:
+      path: README.md
+      content: |
+        # status-page
+
+        Public status page. Ship with ./deploy.sh.
+  - add: [deploy.sh, scripts/healthcheck.sh, README.md]
+  - commit: 'chore: deployment scripts'
+
+  # The accident: working-tree deletions, nothing staged.
+  - remove: deploy.sh
+  - remove: scripts/healthcheck.sh
+
+checks:
+  - name:
+      en: deploy.sh is back, byte for byte
+      es: deploy.sh ha vuelto, byte a byte
+    expect:
+      file:
+        path: deploy.sh
+        status: unmodified
+        contentEquals: *deploy-script
+
+  - name:
+      en: healthcheck.sh is back, byte for byte
+      es: healthcheck.sh ha vuelto, byte a byte
+    expect:
+      file:
+        path: scripts/healthcheck.sh
+        status: unmodified
+        contentEquals: *healthcheck
+
+  - name:
+      en: Nothing staged
+      es: Nada en el stage
+    expect:
+      staged: none
+
+  - name:
+      en: History untouched on main
+      es: Historial intacto en main
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git restore .

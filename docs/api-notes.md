@@ -34,8 +34,28 @@ dependency upgrades.
   `x % MAX_UINT32`, so `undefined` poisons the index with NaN. Also needs
   `isFile()/isDirectory()/isSymbolicLink()` methods.
 - Error handling keys off `err.code === 'ENOENT' | 'EEXIST' | ...`.
-- No porcelain: reset/clean/reflog/rebase/revert are emulated in
-  `engine/porcelain/`.
+- Porcelain-grade APIs verified in 1.38.7 (2026-07-17): `commit` accepts
+  `amend: true` natively (plus explicit `parent`, `tree`, `noUpdateBranch`,
+  `dryRun`); full `stash` API with
+  `op: 'push' | 'pop' | 'apply' | 'drop' | 'list' | 'clear' | 'create'`
+  (tracked files only, like real git without `-u`; apply/pop never aborts on
+  conflicts); `cherryPick({ oid, abortOnConflict, noUpdateBranch, dryRun })`;
+  `merge` + `abortMerge` leave real conflict markers in worktree and index
+  when `abortOnConflict: false`. Every commit-creating API accepts explicit
+  author/committer timestamps, so the fixed-clock determinism contract holds.
+- .gitignore IS supported: `statusMatrix({ ignored })` and `isIgnored`.
+- `checkout()` RESETS index and worktree to the target tree: a staged-new
+  file is dropped from the index AND deleted from disk (verified 2026-07-18
+  after it destroyed a player's staged work). It does not implement real
+  git's carry-uncommitted-changes semantics, so branch switching is
+  hand-written in `engine/porcelain/git-command.ts` (switchBranch): symbolic
+  HEAD move + per-path apply/refuse. Never switch branches via checkout().
+- Still absent: reflog for general refs (only stash keeps its own entry
+  list) and all rebase machinery. reset/revert/reflog porcelain stays
+  hand-written over `writeRef`/`resetIndex`/`readCommit`/`walk`.
+- For `git diff` output, `diff@8.0.4` (kpdecker) is already a transitive
+  dependency via just-bash: unified/structured patch generation without
+  adding a new package.
 
 ## @wterm/dom 0.3.0
 

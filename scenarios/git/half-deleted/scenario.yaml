@@ -1,0 +1,66 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/legacy/parser.ts
+      content: &parser |
+        export function parseLegacyRow(line: string) {
+          const [id, name, amount] = line.split(';')
+          return { id, name, amount: Number(amount) }
+        }
+  - write:
+      path: src/app.ts
+      content: |
+        import { parseLegacyRow } from './legacy/parser'
+
+        export function importRow(line: string) {
+          return parseLegacyRow(line)
+        }
+  - write:
+      path: tests/legacy-rows.csv
+      content: |
+        id;name;amount
+        1;Aria;19.99
+        2;Bruno;7.50
+  - add: [src/legacy/parser.ts, src/app.ts, tests/legacy-rows.csv]
+  - commit: 'feat: import pipeline'
+
+  # The over-eager cleanup: TWO deletions staged at once
+  # (add mirrors real git and records removals).
+  - remove: src/legacy/parser.ts
+  - add: [src/legacy/parser.ts]
+  - remove: tests/legacy-rows.csv
+  - add: [tests/legacy-rows.csv]
+
+checks:
+  - name:
+      en: parser.ts is back, exactly as committed
+      es: parser.ts ha vuelto, tal y como se commiteó
+    expect:
+      file:
+        path: src/legacy/parser.ts
+        status: unmodified
+        contentEquals: *parser
+
+  - name:
+      en: The fixture's deletion stays staged, ready to ship
+      es: El borrado del fixture sigue staged, listo para salir
+    expect:
+      file:
+        path: tests/legacy-rows.csv
+        status: deleted-staged
+
+  - name:
+      en: History untouched on main
+      es: Historial intacto en main
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git reset src/legacy/parser.ts
+    - git restore src/legacy/parser.ts

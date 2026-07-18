@@ -1,0 +1,79 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/cache.ts
+      content: &clean-cache |
+        const store = new Map<string, string>()
+
+        export function get(key: string) {
+          return store.get(key) ?? null
+        }
+
+        export function put(key: string, value: string) {
+          store.set(key, value)
+        }
+  - write:
+      path: src/server.ts
+      content: |
+        import { get, put } from './cache'
+
+        export function handle(key: string, value?: string) {
+          if (value !== undefined) put(key, value)
+          return get(key)
+        }
+  - add: [src/cache.ts, src/server.ts]
+  - commit: 'feat: request cache'
+
+  # The spike: proper habit, its own branch, experiment committed there.
+  # Setup leaves HEAD standing on the spike.
+  - branch: { name: spike/cache-ttl, checkout: true }
+  - write:
+      path: src/cache.ts
+      content: |
+        const store = new Map<string, { value: string; expires: number }>()
+
+        export function get(key: string) {
+          const hit = store.get(key)
+          // TODO: expiry check needs an injectable clock
+          return hit ? hit.value : null
+        }
+
+        export function put(key: string, value: string) {
+          store.set(key, { value, expires: 0 })
+        }
+  - add: [src/cache.ts]
+  - commit: 'spike: cache ttl experiment'
+
+checks:
+  - name:
+      en: Back on main, history untouched
+      es: De vuelta en main, historial intacto
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+  - name:
+      en: The spike branch is gone
+      es: La rama del spike ya no existe
+    expect:
+      branch:
+        name: spike/cache-ttl
+        absent: true
+
+  - name:
+      en: The experiment left the working tree
+      es: El experimento salió del working tree
+    expect:
+      file:
+        path: src/cache.ts
+        status: unmodified
+        contentEquals: *clean-cache
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git switch main
+    - git branch -D spike/cache-ttl

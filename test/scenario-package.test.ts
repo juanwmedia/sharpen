@@ -18,7 +18,7 @@ version: 1
 id: test/demo
 kind: git
 pack: git
-title: Demo
+title: { en: Demo, es: Demo ES }
 difficulty: easy
 spec:
   tree: |
@@ -65,7 +65,7 @@ describe('parseScenarioMd', () => {
       id: 'test/demo',
       kind: 'git',
       pack: 'git',
-      title: 'Demo',
+      title: { en: 'Demo', es: 'Demo ES' },
       difficulty: 'easy',
     })
     expect(parsed.manifest.spec?.tree).toContain('repo/')
@@ -128,8 +128,30 @@ describe('parseGitMechanics (the interpreter IS the validator)', () => {
   it('rejects an unknown check predicate naming the supported vocabulary', () => {
     const doc = MINIMAL_MECHANICS.replace('{ untracked: none }', '{ stashDepth: 1 }')
     expect(() => parseGitMechanics(doc)).toThrow(
-      /unknown predicate "stashDepth"; this engine supports: untracked, staged, head, file/
+      /unknown predicate "stashDepth"; this engine supports: untracked, staged, head, branch, file/
     )
+  })
+
+  it('parses the branch predicate and rejects a nameless one', () => {
+    const good = parseGitMechanics(
+      MINIMAL_MECHANICS.replace('{ untracked: none }', '{ branch: { name: main, commits: 1 } }')
+    )
+    expect(good.checks).toHaveLength(1)
+    expect(() =>
+      parseGitMechanics(MINIMAL_MECHANICS.replace('{ untracked: none }', '{ branch: { commits: 1 } }'))
+    ).toThrow(/expect\.branch needs \{ name, commits\? \| absent: true \}/)
+    expect(() =>
+      parseGitMechanics(MINIMAL_MECHANICS.replace('{ untracked: none }', '{ branch: { name: main, commits: -2 } }'))
+    ).toThrow(/expect\.branch\.commits must be a non-negative integer/)
+    const gone = parseGitMechanics(
+      MINIMAL_MECHANICS.replace('{ untracked: none }', '{ branch: { name: spike, absent: true } }')
+    )
+    expect(gone.checks).toHaveLength(1)
+    expect(() =>
+      parseGitMechanics(
+        MINIMAL_MECHANICS.replace('{ untracked: none }', '{ branch: { name: spike, absent: true, commits: 1 } }')
+      )
+    ).toThrow(/absent excludes commits/)
   })
 
   it('requires bilingual check names and a non-empty solution', () => {
@@ -145,10 +167,11 @@ describe('parseGitMechanics (the interpreter IS the validator)', () => {
 describe('assembleScenario', () => {
   it('assembles Clean sweep with the same public shape as before, plus schema-2 fields', () => {
     expect(cleanSweep.id).toBe('git/clean-sweep')
-    expect(cleanSweep.version).toBe(1)
+    // Version 2: the localized title (2026-07-17) is a published change.
+    expect(cleanSweep.version).toBe(2)
     expect(cleanSweep.kind).toBe('git')
     expect(cleanSweep.pack).toBe('git')
-    expect(cleanSweep.title).toBe('Clean sweep')
+    expect(cleanSweep.title).toEqual({ en: 'Clean sweep', es: 'Limpieza general' })
     expect(cleanSweep.difficulty).toBe('medium')
     expect(cleanSweep.timeLimitMs).toBe(60_000)
     expect(cleanSweep.themes).toEqual(['working tree', 'untracked', 'tracked', 'staging'])
@@ -171,7 +194,7 @@ version: 1
 id: test/demo
 kind: git
 pack: git
-title: Demo
+title: { en: Demo, es: Demo ES }
 difficulty: easy`,
         }),
         walkthroughSrc: 'Do the thing.',

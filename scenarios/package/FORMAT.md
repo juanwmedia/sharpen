@@ -53,7 +53,7 @@ version: 1
 id: git/clean-sweep
 kind: git
 pack: git
-title: Clean sweep
+title: { en: Clean sweep, es: Limpieza general }
 difficulty: medium
 timeLimitMs: 60000
 themes: [working tree, untracked, tracked, staging]
@@ -113,9 +113,13 @@ solution:
 
 - **Setup ops** mirror `ScenarioSetupEnv` one to one: `write`, `remove`,
   `add`, `commit`, `branch`, `checkout`. Deterministic by construction: a
-  document cannot call `Date.now()`.
+  document cannot call `Date.now()`. `add` mirrors real git: staging a path
+  that no longer exists on disk records the deletion (that is how a setup
+  fabricates a staged `git rm`).
 - **Check predicates**: `untracked: none`, `staged: none`,
-  `head: { branch?, commits? }`, `file: { path, status?, contentEquals? }`.
+  `head: { branch?, commits? }`, `branch: { name, commits? | absent: true }`
+  (any branch tip: prove main never moved while HEAD is elsewhere, or that
+  a deleted branch is really gone), `file: { path, status?, contentEquals? }`.
   Authors write only the bilingual `name`; the pass/fail **detail is rendered
   by the engine** (both languages, consistent everywhere). Extending either
   vocabulary means implementing it in `kinds/git.ts` first.
@@ -159,9 +163,28 @@ export const scenarios: Scenario[] = [cleanSweep, newScenario]
 ## Authoring invariants (humans and agents)
 
 - Briefing and objective never name the solving command.
+- **No two scenarios share the same exact canonical command.** Same family
+  is fine (restore appears twice, aimed differently); the same literal move
+  twice is not. Check the pack's solution matrix before designing.
+- **Difficulty lives in the git state, never in side quests.** If solving
+  requires reading application code or non-git tooling, the design is wrong;
+  the diagnosis tools are git's own (status, log, diff, branch).
+- When discovery is the lesson (the player must figure out WHICH file or
+  branch), the objective, spec.tree annotations and check names must not
+  leak the answer. Failed-check details may name paths: that is feedback
+  after an attempt, not a spoiler before it.
+- **Real git is the only authority (paramount).** Real git never silently
+  destroys uncommitted work: it travels or the command refuses. Scenarios
+  may rely on those protections. If while authoring or testing you find a
+  command combination where the arena loses work that real git would keep
+  (or diverges from a real refusal), that is an ENGINE bug: stop, probe
+  real git (LC_ALL=C), fix the porcelain or report it. Never author around
+  the divergence and never let the mentor's explanation of it stand.
 - Themes are concept chips (English git vocabulary), not commands.
 - Checks are state-based only: they see the snapshot, never the transcript.
-- Check `name` bilingual; titles and `spec.tree` English; `walkthrough.md`
+- `title` and check `name` bilingual. The Spanish title is written for
+  Spanish, never a literal translation. Slugs derive from `title.en` (one
+  public URL across languages); `spec.tree` English; `walkthrough.md`
   English only.
 - Published `version` is immutable: bump it on any change.
 - If the scenario needs a git subcommand the porcelain lacks, extend

@@ -1,0 +1,57 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/client.ts
+      content: |
+        export async function fetchJson(url: string) {
+          const response = await fetch(url)
+          return response.json()
+        }
+  - add: [src/client.ts]
+  - commit: 'feat: api client'
+
+  # The wet paint: half an hour of work, sitting uncommitted on main.
+  - write:
+      path: src/client.ts
+      content: &retry-work |
+        export async function fetchJson(url: string, retries = 3) {
+          for (let attempt = 1; ; attempt++) {
+            const response = await fetch(url)
+            if (response.ok) return response.json()
+            if (attempt >= retries) throw new Error(`${url} failed after ${retries} attempts`)
+          }
+        }
+
+checks:
+  - name:
+      en: HEAD is feature/retry-loop with the work committed
+      es: HEAD es feature/retry-loop con el trabajo commiteado
+    expect:
+      head:
+        branch: feature/retry-loop
+        commits: 2
+
+  - name:
+      en: The committed file is exactly the retry work
+      es: El archivo commiteado es exactamente el trabajo de retry
+    expect:
+      file:
+        path: src/client.ts
+        status: unmodified
+        contentEquals: *retry-work
+
+  - name:
+      en: main never moved
+      es: main no se movió
+    expect:
+      branch:
+        name: main
+        commits: 1
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git switch -c feature/retry-loop
+    - "git commit -am 'feat: retry loop for flaky endpoints'"

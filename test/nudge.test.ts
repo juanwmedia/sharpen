@@ -6,6 +6,7 @@ function verdict(stateHash: string, passes: boolean[]): Verdict {
   return {
     pass: passes.every(Boolean),
     stateHash,
+    lost: [],
     checks: passes.map((pass, i) => ({
       name: { en: `check ${i}`, es: `check ${i}` },
       pass,

@@ -99,6 +99,40 @@ Browser (SPA)                        Local server (Node)
   GitHub Issues as the submission channel and GitHub's own clock closing the
   timing hole (v3).
 
+## Current limitations
+
+A living list, updated with every engine change. The arena is honest at the
+prompt too: any unimplemented subcommand answers
+`sharpen: 'git X' is not available in this arena (yet)`.
+
+**Git porcelain implemented today:** `status` (`-s`), `add` (paths, `-A`),
+`commit` (`-m`, `-a`, `-am`), `log` (`--oneline`, `-n`), `branch` (list,
+create, `-d` with the real unmerged refusal, `-D`), `checkout` (`-b`, branch,
+`-- <paths>`), `switch` (plain and `-c`), `restore` (`--staged`, pathspecs),
+`clean` (`-n`, `-f`, `-d`), `rm` (`--cached`, `-f`, with real git's refusals
+on staged or modified files), `reset` (the unstage form:
+bare, paths, `HEAD <paths>`), `diff` (unstaged and `--staged`/`--cached`,
+with real git's colors and hunk format), `init`.
+
+**Not there yet, planned in this order:** `reset --soft`/`--hard` over
+history, `commit --amend`, `reflog`, `stash`, `cherry-pick`, `revert`,
+`restore --source`, `merge` with real conflict markers.
+
+**Out of scope by design:** remotes (`push`, `pull`, `fetch`, `clone`): the
+arena is a local, deterministic sandbox. `rebase`: it does not fit the timed
+arena format. `git worktree`: being explored as its own future pack (agent
+isolation workflows).
+
+**Other honest edges:**
+
+- `restore <path>` sources content from HEAD rather than the index; behavior
+  is identical unless the path has staged changes.
+- `git <command> --help` never replicates real manuals: it answers a short
+  arena card (what the command does, exactly what this arena supports, and a
+  pointer to the mentor, who owns the concepts).
+- The shell is just-bash: real pipes, grep, redirections and coreutils, but
+  not every GNU flag of every tool.
+
 ## Scoring (v1)
 
 Pass: `max(10, 100 - seconds elapsed)`. Timeout or fail: 0, but the attempt is

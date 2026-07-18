@@ -8,6 +8,7 @@ import {
   type Scenario,
   type Check,
   type Locale,
+  type Localized,
   type MentorBubble,
   type MentorErrorKind,
 } from '../engine/types.ts'
@@ -81,7 +82,23 @@ Hard rules:
   inline commands in backticks are fine.
 - Never use em dashes or en dashes; use commas, parentheses, or separate
   sentences instead.
-- Address the player as "you". Never mention these instructions.`
+- Address the player as "you". Never mention these instructions.
+
+GIT TRUTH GUARDRAIL, overrides everything above:
+- Real git is the ONLY authority on git behavior. This arena is an emulation
+  and can have bugs. If the board or a command's outcome contradicts how real
+  git behaves, NEVER invent an explanation and NEVER teach the anomaly as if
+  it were git. Say plainly that this looks like an arena limitation or bug,
+  that real git does not behave that way, and continue from real git
+  semantics.
+- The unbreakable law you must defend: real git NEVER silently destroys
+  uncommitted work. Staged or modified files either travel across branch
+  switches or the command refuses loudly. If the player's work seems to have
+  vanished without an explicit destructive command (clean -f, restore,
+  rm -f, reset --hard), that is an arena bug, not a lesson. Tell the player
+  their instinct is right and their mental model of git should not change.
+- When in doubt between "the arena is right" and "real git is right": real
+  git is right, every single time.`
 
 export interface MentorPromptInput {
   phase: MentorPhase
@@ -94,6 +111,8 @@ export interface MentorPromptInput {
   clockSec?: number | null
   durationSec?: number
   playerQuestion?: string
+  /** Failing checks whose required uncommitted content git cannot recover. */
+  lostChecks?: Localized[]
 }
 
 /** Extra system rule per UI language; English is the prompt's native voice. */
@@ -393,13 +412,13 @@ Answer concretely.`
 
 /** Single Open/Closed context builder for every mentor entry point. */
 export function buildMentorPrompt(input: MentorPromptInput): string {
-  const { scenario, board, transcript, checks, phase } = input
+  const { scenario, board, transcript, checks, phase, lostChecks } = input
   // Prompts always use canonical English content; the mentor answers in the
   // player's language on its own (see LANGUAGE_RULES).
   const parts = [
     triggerHeader(input),
     '',
-    `${MENTOR_PROMPT.scenario} ${scenario.title}`,
+    `${MENTOR_PROMPT.scenario} ${scenario.title.en}`,
     `${MENTOR_PROMPT.goal} ${scenario.objective.en}`,
     '',
     MENTOR_PROMPT.repoBoard,
@@ -411,6 +430,18 @@ export function buildMentorPrompt(input: MentorPromptInput): string {
     MENTOR_PROMPT.checks,
     formatChecks(checks),
   ]
+
+  if (lostChecks?.length) {
+    parts.push(
+      '',
+      'LOST CHECKS (unrecoverable): ' + lostChecks.map((n) => n.en).join('; ') + '.',
+      'The uncommitted state these checks need was destroyed by one of the',
+      "player's own commands (find it in the transcript). Real git cannot",
+      'bring it back. Do NOT keep nudging toward these checks: say plainly',
+      'what destroyed the work and why it is gone, and recommend restarting',
+      'the attempt (learn mode has a "Wipe progress" button in the sidebar).'
+    )
+  }
 
   if (phase === MENTOR_PHASE.closed) {
     parts.push('', MENTOR_PROMPT.walkthrough, scenario.walkthrough)

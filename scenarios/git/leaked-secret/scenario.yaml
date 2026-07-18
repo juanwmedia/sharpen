@@ -1,0 +1,55 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# The engine interprets this; nothing here is executable code.
+setup:
+  - write:
+      path: src/notify.ts
+      content: |
+        export function receiptSubject(orderId: string) {
+          return `Your receipt for order ${orderId}`
+        }
+  - write:
+      path: README.md
+      content: |
+        # pay-notify
+
+        Payment receipt notifications.
+  - add: [src/notify.ts, README.md]
+  - commit: 'feat: receipt notifications'
+
+  # The slip: a real credential written for a local test, then staged.
+  - write:
+      path: .env
+      content: &env-file |
+        STRIPE_API_KEY=sk_live_51TESTFAKEKEY000000
+        STRIPE_WEBHOOK_SECRET=whsec_TESTFAKE000
+  - add: [.env]
+
+checks:
+  - name:
+      en: Nothing left staged
+      es: Nada queda en el stage
+    expect:
+      staged: none
+
+  - name:
+      en: The .env file survives on disk, untracked
+      es: El archivo .env sigue en disco, sin seguimiento
+    expect:
+      file:
+        path: .env
+        status: untracked
+        contentEquals: *env-file
+
+  - name:
+      en: History untouched on main
+      es: Historial intacto en main
+    expect:
+      head:
+        branch: main
+        commits: 1
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - git rm --cached .env

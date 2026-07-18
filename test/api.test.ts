@@ -14,10 +14,10 @@ process.env.SHARPEN_NO_MENTOR = '1'
 
 const { app, runs } = await import('../server/app.ts')
 
-async function createRun(mode?: 'learn' | 'challenge'): Promise<string> {
+async function createRun(mode?: 'learn' | 'challenge', scenarioId = 'git/clean-sweep'): Promise<string> {
   const res = await request(app)
     .post('/api/runs')
-    .send({ scenarioId: 'git/clean-sweep', player: 'tester', ...(mode ? { mode } : {}) })
+    .send({ scenarioId, player: 'tester', ...(mode ? { mode } : {}) })
   expect(res.status).toBe(200)
   if (mode) expect(res.body.mode).toBe(mode)
   return res.body.runId as string
@@ -28,11 +28,12 @@ describe('sharpen API', () => {
     const res = await request(app).get('/api/scenarios')
     expect(res.status).toBe(200)
     expect(Array.isArray(res.body)).toBe(true)
-    const [first] = res.body as Array<Record<string, unknown>>
+    // Registry order is curated (easy to hard), so look clean-sweep up by id.
+    const first = (res.body as Array<Record<string, unknown>>).find((s) => s.id === 'git/clean-sweep')
     expect(first).toMatchObject({
       id: 'git/clean-sweep',
       pack: 'git',
-      title: 'Clean sweep',
+      title: { en: 'Clean sweep', es: 'Limpieza general' },
       difficulty: 'medium',
       timeLimitMs: 60_000,
     })
@@ -261,6 +262,71 @@ describe('sharpen API', () => {
     const submit = await request(app).post(`/api/runs/${runId}/submit`)
     expect(submit.body.nudged).toBe(true)
     expect(run.lastCommandErrored).toBe(false)
+  })
+
+  it('progress reports scenarios solved via challenge evidence or passed learn snapshots', async () => {
+    // A challenge pass earlier in this suite already recorded evidence for
+    // clean-sweep; a passed learn snapshot marks a second scenario.
+    const learnId = encodeURIComponent('git/leaked-secret')
+    await request(app)
+      .put(`/api/learn/${learnId}`)
+      .send({
+        schema: 1,
+        challengeId: 'git/leaked-secret',
+        locale: 'en',
+        status: 'passed',
+        transcript: [],
+        mentorFeed: [],
+        mentorSessionId: null,
+        mentorTurns: 0,
+        updatedAt: 1,
+      })
+
+    const res = await request(app).get('/api/progress')
+    expect(res.status).toBe(200)
+    const completed = res.body.completed as string[]
+    expect(completed).toContain('git/clean-sweep')
+    expect(completed).toContain('git/leaked-secret')
+    // Never played: must not be reported as done.
+    expect(completed).not.toContain('git/half-deleted')
+
+    await request(app).delete(`/api/learn/${learnId}`)
+  })
+
+  it('flags a dead-end run: destroyed uncommitted work that git cannot recover', async () => {
+    const runId = await createRun('learn', 'git/ship-only-the-fix')
+    await request(app).post(`/api/runs/${runId}/start`)
+
+    // Fresh run: failing checks, but nothing lost yet.
+    const before = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(before.body.lost).toEqual([])
+
+    // The incident: restore discards the TODO edit, which lives in no commit.
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'git restore TODO.md', output: '' })
+    const after = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(after.body.pass).toBe(false)
+    const lost = after.body.lost as Array<{ en: string; es: string }>
+    expect(lost).toHaveLength(1)
+    expect(lost[0]!.en).toBe('Your TODO edit stays local')
+  })
+
+  it('stays silent when the required content still exists as a git blob (conservative)', async () => {
+    const runId = await createRun('learn', 'git/ship-only-the-fix')
+    await request(app).post(`/api/runs/${runId}/start`)
+
+    // Staging writes the edited blob into the object database; the later
+    // worktree restore fails the check but the content is still reachable.
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'git add TODO.md', output: '' })
+    await request(app)
+      .post(`/api/runs/${runId}/command`)
+      .send({ command: 'git restore TODO.md', output: '' })
+    const res = await request(app).post(`/api/runs/${runId}/submit`)
+    expect(res.body.pass).toBe(false)
+    expect(res.body.lost).toEqual([])
   })
 
   // Deep links (a reload on /git/clean-sweep) must fall through to the SPA
