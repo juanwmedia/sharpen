@@ -1,0 +1,50 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/pricing.ts
+      content: |
+        export type DayKind = 'weekday' | 'weekend'
+        
+        const weekdayRate = (cents: number) => cents
+        const weekendRate = (cents: number) => Math.round(cents * 1.5)
+        
+        export function priceCents(baseCents: number, day: DayKind): number {
+          // Always weekday. The weekend surcharge never clocks in.
+          const rate = weekdayRate
+          return rate(baseCents)
+        }
+
+checks:
+  - name:
+      en: "exports priceCents"
+      es: "exporta priceCents"
+    expect:
+      exports:
+        entry: "src/pricing.ts"
+        export: "priceCents"
+
+  - name:
+      en: "weekday keeps base"
+      es: "weekday mantiene la base"
+    expect:
+      returns:
+        entry: "src/pricing.ts"
+        export: "priceCents"
+        args: [100,"weekday"]
+        equals: 100
+
+  - name:
+      en: "weekend applies 1.5x"
+      es: "weekend aplica 1.5x"
+    expect:
+      returns:
+        entry: "src/pricing.ts"
+        export: "priceCents"
+        args: [100,"weekend"]
+        equals: 150
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/pricing.ts b64:ZXhwb3J0IHR5cGUgRGF5S2luZCA9ICd3ZWVrZGF5JyB8ICd3ZWVrZW5kJwoKY29uc3Qgd2Vla2RheVJhdGUgPSAoY2VudHM6IG51bWJlcikgPT4gY2VudHMKY29uc3Qgd2Vla2VuZFJhdGUgPSAoY2VudHM6IG51bWJlcikgPT4gTWF0aC5yb3VuZChjZW50cyAqIDEuNSkKCmV4cG9ydCBmdW5jdGlvbiBwcmljZUNlbnRzKGJhc2VDZW50czogbnVtYmVyLCBkYXk6IERheUtpbmQpOiBudW1iZXIgewogIGNvbnN0IHJhdGUgPSBkYXkgPT09ICd3ZWVrZW5kJyA/IHdlZWtlbmRSYXRlIDogd2Vla2RheVJhdGUKICByZXR1cm4gcmF0ZShiYXNlQ2VudHMpCn0K

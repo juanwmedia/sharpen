@@ -1,0 +1,55 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/payout.ts
+      content: |
+        function loadAccount(id: number, cb: (err: Error | null, account?: { id: number }) => void): void {
+          cb(null, { id })
+        }
+        function authorize(account: { id: number }, cb: (err: Error | null, token?: string) => void): void {
+          cb(null, 'tok-' + account.id)
+        }
+        function capture(token: string, cb: (err: Error | null, ok?: boolean) => void): void {
+          cb(null, token.startsWith('tok-'))
+        }
+        
+        export function runPayout(id: number): Promise<string> {
+          return new Promise((resolve, reject) => {
+            loadAccount(id, (err, account) => {
+              if (err || !account) return reject(err || new Error('no account'))
+              authorize(account, (err2, token) => {
+                if (err2 || !token) return reject(err2 || new Error('no token'))
+                capture(token, (err3, ok) => {
+                  if (err3 || !ok) return reject(err3 || new Error('capture failed'))
+                  // Wrong receipt token. The nest is atmosphere; the check is this string.
+                  resolve('pending:' + id)
+                })
+              })
+            })
+          })
+        }
+
+checks:
+  - name:
+      en: "exports runPayout"
+      es: "exporta runPayout"
+    expect:
+      exports:
+        entry: "src/payout.ts"
+        export: "runPayout"
+
+  - name:
+      en: "runPayout(42) pays"
+      es: "runPayout(42) paga"
+    expect:
+      returns:
+        entry: "src/payout.ts"
+        export: "runPayout"
+        args: [42]
+        equals: "paid:42"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/payout.ts b64:ZnVuY3Rpb24gbG9hZEFjY291bnQoaWQ6IG51bWJlciwgY2I6IChlcnI6IEVycm9yIHwgbnVsbCwgYWNjb3VudD86IHsgaWQ6IG51bWJlciB9KSA9PiB2b2lkKTogdm9pZCB7CiAgY2IobnVsbCwgeyBpZCB9KQp9CmZ1bmN0aW9uIGF1dGhvcml6ZShhY2NvdW50OiB7IGlkOiBudW1iZXIgfSwgY2I6IChlcnI6IEVycm9yIHwgbnVsbCwgdG9rZW4/OiBzdHJpbmcpID0+IHZvaWQpOiB2b2lkIHsKICBjYihudWxsLCAndG9rLScgKyBhY2NvdW50LmlkKQp9CmZ1bmN0aW9uIGNhcHR1cmUodG9rZW46IHN0cmluZywgY2I6IChlcnI6IEVycm9yIHwgbnVsbCwgb2s/OiBib29sZWFuKSA9PiB2b2lkKTogdm9pZCB7CiAgY2IobnVsbCwgdG9rZW4uc3RhcnRzV2l0aCgndG9rLScpKQp9CgpleHBvcnQgZnVuY3Rpb24gcnVuUGF5b3V0KGlkOiBudW1iZXIpOiBQcm9taXNlPHN0cmluZz4gewogIHJldHVybiBuZXcgUHJvbWlzZSgocmVzb2x2ZSwgcmVqZWN0KSA9PiB7CiAgICBsb2FkQWNjb3VudChpZCwgKGVyciwgYWNjb3VudCkgPT4gewogICAgICBpZiAoZXJyIHx8ICFhY2NvdW50KSByZXR1cm4gcmVqZWN0KGVyciB8fCBuZXcgRXJyb3IoJ25vIGFjY291bnQnKSkKICAgICAgYXV0aG9yaXplKGFjY291bnQsIChlcnIyLCB0b2tlbikgPT4gewogICAgICAgIGlmIChlcnIyIHx8ICF0b2tlbikgcmV0dXJuIHJlamVjdChlcnIyIHx8IG5ldyBFcnJvcignbm8gdG9rZW4nKSkKICAgICAgICBjYXB0dXJlKHRva2VuLCAoZXJyMywgb2spID0+IHsKICAgICAgICAgIGlmIChlcnIzIHx8ICFvaykgcmV0dXJuIHJlamVjdChlcnIzIHx8IG5ldyBFcnJvcignY2FwdHVyZSBmYWlsZWQnKSkKICAgICAgICAgIHJlc29sdmUoJ3BhaWQ6JyArIGlkKQogICAgICAgIH0pCiAgICAgIH0pCiAgICB9KQogIH0pCn0K

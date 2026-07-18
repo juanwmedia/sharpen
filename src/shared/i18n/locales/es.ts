@@ -16,13 +16,13 @@ export default {
     challenge: 'desafío',
   },
   picker: {
-    eyebrow: 'pack de git',
+    eyebrow: 'escenarios',
     title: 'Elige tu escenario',
     done: 'Hecho',
     ledeLearn:
-      'Sin reloj, un repo real en tu navegador y un mentor socrático observando. Cada {enter} valida: ejecuta un comando y la arena juzga el estado del repo que deja detrás. Desvela la solución cuando quieras el walkthrough.',
+      'Sin reloj, un mentor socrático observando. Las arenas git juzgan el repo; las de TypeScript juzgan lo que devuelven tus exports. Desvela la solución cuando quieras el walkthrough.',
     ledeChallenge:
-      '60 segundos en el reloj, un repo real en tu navegador y un mentor socrático observando. Cada {enter} valida: ejecuta un comando y la arena juzga el estado del repo que deja detrás. Cualquier solución correcta pasa.',
+      '60 segundos en el reloj, un mentor socrático observando. Las arenas git juzgan el repo; las de TypeScript juzgan lo que devuelven tus exports. Cualquier solución correcta pasa.',
     meta: '{pack} · {difficulty} · {seconds}s',
     enterArena: '→ entra en la arena',
   },
@@ -63,9 +63,9 @@ export default {
       '✗ "{check}": el trabajo sin commitear que necesita este check fue destruido; git no puede recuperarlo. Borra el progreso y vuelve a intentarlo.',
     lostChallenge:
       '✗ "{check}": ese trabajo sin commitear se perdió para siempre; esta run ya no puede ponerse en verde. Así es git.',
-    pin: 'Fijar el terminal (siempre visible)',
-    unpin: 'Soltar el terminal (se desplaza con la página)',
-    solved: '✓ Escenario resuelto. La arena validó el estado de tu repo.',
+    pin: 'Fijar (siempre visible)',
+    unpin: 'Soltar (se desplaza con la página)',
+    solved: '✓ Escenario resuelto. La arena validó el tablero.',
     notYetQuiet: '✗ todavía no: {green}/{total} checks en verde',
     notYetLoud: '✗ Todavía no. Mira el panel de veredicto. El mentor tiene una pista.',
     alreadySolved: 'Ya está resuelto. Pregunta al mentor abajo o vuelve a por el siguiente escenario.',
@@ -77,7 +77,10 @@ export default {
   },
   chat: {
     eyebrow: 'conversación',
-    idle: 'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña. Los comandos viven en el terminal, donde `git <comando> --help` te dice qué soporta esta arena; esta caja es para los porqués.',
+    idleGit:
+      'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña. Los comandos viven en el terminal, donde `git <comando> --help` te dice qué soporta esta arena; esta caja es para los porqués.',
+    idleTs:
+      'Tus intentos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña. Las ediciones viven en el editor del workspace; Run pide a la arena que juzgue lo que devuelven los exports. Esta caja es para los porqués.',
     placeholderLive: 'Pide un empujón…',
     placeholderFree: 'Pregunta lo que quieras al mentor…',
     send: 'Enviar',
@@ -123,7 +126,7 @@ export default {
     note: 'El chat siempre te responde. Resolver (y la revelación al agotarse el tiempo) siempre habla.',
   },
   shortcut: {
-    swap: 'Ctrl + la tecla sobre el Tab (º en teclado español) alterna el foco entre el terminal y el chat',
+    swap: 'Ctrl + la tecla sobre el Tab (º en teclado español) alterna el foco entre el panel de práctica y el chat',
   },
   verdict: {
     eyebrow: 'veredicto',

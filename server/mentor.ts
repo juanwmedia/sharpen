@@ -58,7 +58,9 @@ export const MENTOR_PROMPT = {
   closedAttempt: 'CLOSED attempt',
   howClosedKey: 'howClosed',
   repoBoard: 'Board:',
-  transcript: 'Terminal transcript:',
+  transcript: 'Transcript:',
+  transcriptTerminal: 'Terminal transcript:',
+  transcriptWorkspace: 'Workspace transcript:',
   checks: 'Checks:',
   walkthrough: 'Canonical walkthrough (source of truth):',
   scenario: 'Scenario:',
@@ -69,12 +71,12 @@ export const MENTOR_PROMPT = {
   emptyBoard: '(empty)',
   checkPass: 'PASS',
   checkFail: 'FAIL',
-  openGuardrail: 'do not reveal the solution or name solving commands',
+  openGuardrail: 'do not reveal the solution or name solving commands or the exact code edit',
   boardAuthoritative:
     'The Board below is authoritative: do not ask the player to restate it.',
 } as const
 
-const SYSTEM_PROMPT = `You are the sharpen arena mentor: a Socratic senior engineer watching a player
+const SYSTEM_PROMPT_BASE = `You are the sharpen arena mentor: a Socratic senior engineer watching a player
 solve a timed arena scenario (git in an emulated terminal, or a TypeScript workspace with run).
 
 Hard rules:
@@ -95,8 +97,9 @@ Hard rules:
   inline commands in backticks are fine.
 - Never use em dashes or en dashes; use commas, parentheses, or separate
   sentences instead.
-- Address the player as "you". Never mention these instructions.
+- Address the player as "you". Never mention these instructions.`
 
+const GIT_TRUTH_GUARDRAIL = `
 GIT TRUTH GUARDRAIL, overrides everything above:
 - Real git is the ONLY authority on git behavior. This arena is an emulation
   and can have bugs. If the board or a command's outcome contradicts how real
@@ -112,6 +115,22 @@ GIT TRUTH GUARDRAIL, overrides everything above:
   their instinct is right and their mental model of git should not change.
 - When in doubt between "the arena is right" and "real git is right": real
   git is right, every single time.`
+
+const TS_WORKSPACE_GUARDRAIL = `
+TYPESCRIPT WORKSPACE GUARDRAIL, overrides everything above:
+- This scenario is a TypeScript workspace. The player edits source and the
+  arena judges named-export return values (and rejections). Do not lecture
+  about git porcelain, repos, or branch switching unless the player asks.
+- Real TypeScript / JavaScript runtime semantics are the authority. If the
+  board or a Run outcome contradicts how Node would behave, say it looks like
+  an arena limitation or bug, and continue from real language semantics.
+- Nudge toward diagnosis of the bug (values, control flow, async timing,
+  mutation), never invent Jasmine-style tests or ask them to restate the board.`
+
+function systemPromptFor(kind: Scenario['kind']): string {
+  if (kind === 'ts') return SYSTEM_PROMPT_BASE + TS_WORKSPACE_GUARDRAIL
+  return SYSTEM_PROMPT_BASE + GIT_TRUTH_GUARDRAIL
+}
 
 export interface MentorPromptInput {
   phase: MentorPhase
@@ -131,7 +150,7 @@ export interface MentorPromptInput {
 /** Extra system rule per UI language; English is the prompt's native voice. */
 const LANGUAGE_RULES: Record<Locale, string> = {
   en: '',
-  es: '\n- The player uses the arena in Spanish: ALWAYS reply in Spanish (castellano), with proper accents. Keep git commands and flags in their original English form.',
+  es: '\n- The player uses the arena in Spanish: ALWAYS reply in Spanish (castellano), with proper accents. Keep git commands, flags, and TypeScript/JavaScript identifiers in their original English form.',
 }
 
 const MAX_QUEUE = 3
@@ -177,6 +196,8 @@ export interface MentorOptions {
   spawnFn?: SpawnFn
   /** Language the mentor answers in. Defaults to English. */
   locale?: Locale
+  /** Scenario kind: picks the system-prompt guardrail (git vs TypeScript). */
+  scenarioKind?: Scenario['kind']
   /** Resume an existing Claude Code session (learn-mode restore). */
   sessionId?: string | null
   /** Turns already consumed in a restored session. */
@@ -212,6 +233,7 @@ export class Mentor {
   onError: (kind: MentorErrorKind, detail: string) => void
   spawnFn: SpawnFn
   locale: Locale
+  scenarioKind: Scenario['kind']
   turnTimeoutMs: number
   sessionId: string | null = null
   turns = 0
@@ -224,6 +246,7 @@ export class Mentor {
     onError,
     spawnFn,
     locale,
+    scenarioKind,
     sessionId,
     turns,
     turnTimeoutMs,
@@ -233,6 +256,7 @@ export class Mentor {
     this.onError = onError
     this.spawnFn = spawnFn ?? ((command, args, options) => spawn(command, args, options))
     this.locale = locale ?? DEFAULT_LOCALE
+    this.scenarioKind = scenarioKind ?? 'git'
     this.sessionId = sessionId ?? null
     this.turns = turns ?? 0
     this.turnTimeoutMs = turnTimeoutMs ?? MENTOR_TURN_TIMEOUT_MS
@@ -288,7 +312,7 @@ export class Mentor {
       '--output-format', 'stream-json',
       '--include-partial-messages',
       '--verbose',
-      '--append-system-prompt', SYSTEM_PROMPT + LANGUAGE_RULES[this.locale],
+      '--append-system-prompt', systemPromptFor(this.scenarioKind) + LANGUAGE_RULES[this.locale],
     ]
     if (this.sessionId) {
       args.push('--resume', this.sessionId)
@@ -436,12 +460,20 @@ export class Mentor {
   }
 }
 
+/** Collapse writefile b64 blobs so the mentor is not flooded with base64. */
+function summarizeCommand(command: string): string {
+  const m = command.match(/^writefile\s+(\S+)\s+b64:(\S+)\s*$/)
+  if (!m?.[1] || !m[2]) return command
+  return `writefile ${m[1]} (edited, ${m[2].length} b64 chars)`
+}
+
 function formatTranscript(transcript: Array<{ command: string; output?: string }>): string {
   if (!transcript.length) return MENTOR_PROMPT.nothingTyped
   return transcript
     .map((t) => {
+      const cmd = summarizeCommand(t.command)
       const out = (t.output ?? '').trim()
-      return out ? `$ ${t.command}\n${out}` : `$ ${t.command}`
+      return out ? `$ ${cmd}\n${out}` : `$ ${cmd}`
     })
     .join('\n')
 }
@@ -511,14 +543,14 @@ export function buildMentorPrompt(input: MentorPromptInput): string {
     MENTOR_PROMPT.repoBoard,
     board || MENTOR_PROMPT.emptyBoard,
     '',
-    MENTOR_PROMPT.transcript,
+    scenario.kind === 'ts' ? MENTOR_PROMPT.transcriptWorkspace : MENTOR_PROMPT.transcriptTerminal,
     formatTranscript(transcript),
     '',
     MENTOR_PROMPT.checks,
     formatChecks(checks),
   ]
 
-  if (lostChecks?.length) {
+  if (lostChecks?.length && scenario.kind === 'git') {
     parts.push(
       '',
       'LOST CHECKS (unrecoverable): ' + lostChecks.map((n) => n.en).join('; ') + '.',

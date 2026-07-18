@@ -1,0 +1,47 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/inventory.ts
+      content: |
+        const STOCK = ['pen', 'ink']
+        
+        export function getStock(): string[] {
+          // Returns the live array. Mutations stick.
+          return STOCK
+        }
+
+checks:
+  - name:
+      en: "exports getStock"
+      es: "exporta getStock"
+    expect:
+      exports:
+        entry: "src/inventory.ts"
+        export: "getStock"
+
+  - name:
+      en: "getStock returns pen and ink"
+      es: "getStock devuelve pen e ink"
+    expect:
+      returns:
+        entry: "src/inventory.ts"
+        export: "getStock"
+        args: []
+        equals: ["pen","ink"]
+
+  - name:
+      en: "stock length stays 2 after push"
+      es: "el stock sigue length 2 tras push"
+    expect:
+      arrayPushStable:
+        entry: "src/inventory.ts"
+        export: "getStock"
+        args: []
+        pushValue: "leak"
+        lengthEquals: 2
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/inventory.ts b64:Y29uc3QgU1RPQ0sgPSBbJ3BlbicsICdpbmsnXQoKZXhwb3J0IGZ1bmN0aW9uIGdldFN0b2NrKCk6IHN0cmluZ1tdIHsKICByZXR1cm4gWy4uLlNUT0NLXQp9Cg==

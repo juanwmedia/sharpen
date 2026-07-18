@@ -1,0 +1,46 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/shipping.ts
+      content: |
+        const FREE_SHIPPING_MIN_CENTS = 5000
+        
+        export function qualifiesForFreeShipping(subtotalCents: number): boolean {
+          // Threshold is inverted. $49.99 currently "wins".
+          return subtotalCents < FREE_SHIPPING_MIN_CENTS
+        }
+
+checks:
+  - name:
+      en: "exports qualifiesForFreeShipping"
+      es: "exporta qualifiesForFreeShipping"
+    expect:
+      exports:
+        entry: "src/shipping.ts"
+        export: "qualifiesForFreeShipping"
+
+  - name:
+      en: "$49.99 does not qualify"
+      es: "$49.99 no califica"
+    expect:
+      returns:
+        entry: "src/shipping.ts"
+        export: "qualifiesForFreeShipping"
+        args: [4999]
+        equals: false
+
+  - name:
+      en: "$50.00 qualifies"
+      es: "$50.00 califica"
+    expect:
+      returns:
+        entry: "src/shipping.ts"
+        export: "qualifiesForFreeShipping"
+        args: [5000]
+        equals: true
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/shipping.ts b64:Y29uc3QgRlJFRV9TSElQUElOR19NSU5fQ0VOVFMgPSA1MDAwCgpleHBvcnQgZnVuY3Rpb24gcXVhbGlmaWVzRm9yRnJlZVNoaXBwaW5nKHN1YnRvdGFsQ2VudHM6IG51bWJlcik6IGJvb2xlYW4gewogIHJldHVybiBzdWJ0b3RhbENlbnRzID49IEZSRUVfU0hJUFBJTkdfTUlOX0NFTlRTCn0K

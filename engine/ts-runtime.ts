@@ -3,13 +3,31 @@ import type { IFileSystem } from 'just-bash'
 
 // Deterministic TypeScript harness for kind=ts. Transpile-only (like FL's
 // playground), then evaluate a named export with fixed args. No Jasmine:
-// scenarios declare returns/throws predicates; this module is the engine.
+// scenarios declare returns/rejects predicates; this module is the engine.
 
-export interface TsCallResult {
-  ok: boolean
-  value?: unknown
-  error?: string
-  stdout: string
+export type TsCallResult =
+  | { ok: true; value: unknown; stdout: string }
+  | { ok: false; reason: 'harness' | 'reject'; error: string; stdout: string }
+
+/** Deep equality for check `equals` (key order must not matter). */
+export function valuesEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== typeof b) return false
+  if (a === null || b === null) return a === b
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false
+    return a.every((v, i) => valuesEqual(v, b[i]))
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    const ao = a as Record<string, unknown>
+    const bo = b as Record<string, unknown>
+    const ak = Object.keys(ao).sort()
+    const bk = Object.keys(bo).sort()
+    if (ak.length !== bk.length) return false
+    if (!ak.every((k, i) => k === bk[i])) return false
+    return ak.every((k) => valuesEqual(ao[k], bo[k]))
+  }
+  return false
 }
 
 /** Transpile a TS/JS source string to plain JS (ES2017, no modules). */
@@ -87,6 +105,51 @@ export async function hasNamedExport(
   return { ok: true }
 }
 
+type LoadedExport =
+  | {
+      ok: true
+      call: (...args: unknown[]) => Promise<TsCallResult>
+      stdout: string
+    }
+  | { ok: false; reason: 'harness'; error: string; stdout: string }
+
+/**
+ * Load + transpile once and return a caller bound to that module instance.
+ * Needed for isolation / same-reference checks (fresh load per call would lie).
+ */
+export async function loadExport(
+  jbFs: IFileSystem,
+  dir: string,
+  entry: string,
+  exportName: string
+): Promise<LoadedExport> {
+  const loaded = await loadModule(jbFs, dir, entry)
+  if (!loaded.ok) {
+    return { ok: false, reason: 'harness', error: loaded.error, stdout: loaded.stdout }
+  }
+  const target = loaded.bag[exportName]
+  if (typeof target !== 'function') {
+    return {
+      ok: false,
+      reason: 'harness',
+      error: `export '${exportName}' is not a function in ${entry}`,
+      stdout: loaded.stdout,
+    }
+  }
+  const stdout = loaded.stdout
+  const call = async (...args: unknown[]): Promise<TsCallResult> => {
+    try {
+      const raw = (target as (...a: unknown[]) => unknown)(...args)
+      const value = await Promise.resolve(raw)
+      return { ok: true, value, stdout }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, reason: 'reject', error: message, stdout }
+    }
+  }
+  return { ok: true, call, stdout }
+}
+
 /**
  * Load a workspace file, transpile, and call `exportName(...args)`.
  * Captures console.log into stdout for the optional `run` porcelain.
@@ -98,23 +161,11 @@ export async function callExport(
   exportName: string,
   args: unknown[]
 ): Promise<TsCallResult> {
-  const loaded = await loadModule(jbFs, dir, entry)
-  if (!loaded.ok) return { ok: false, error: loaded.error, stdout: loaded.stdout }
-  const target = loaded.bag[exportName]
-  if (typeof target !== 'function') {
-    return {
-      ok: false,
-      error: `export '${exportName}' is not a function in ${entry}`,
-      stdout: loaded.stdout,
-    }
+  const loaded = await loadExport(jbFs, dir, entry, exportName)
+  if (!loaded.ok) {
+    return { ok: false, reason: 'harness', error: loaded.error, stdout: loaded.stdout }
   }
-  try {
-    const value = (target as (...a: unknown[]) => unknown)(...args)
-    return { ok: true, value, stdout: loaded.stdout }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return { ok: false, error: message, stdout: loaded.stdout }
-  }
+  return loaded.call(...args)
 }
 
 /** List relative file paths under dir (non-.git), sorted. */

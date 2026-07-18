@@ -1,0 +1,38 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/stock.ts
+      content: |
+        function fetchStock(sku: string): Promise<number> {
+          return Promise.resolve(sku === 'sku-1' ? 3 : 0)
+        }
+        
+        export function stockLabel(sku: string): Promise<string> {
+          // Returns a Promise<number> dressed as Promise<string>. The TV noticed.
+          return fetchStock(sku) as unknown as Promise<string>
+        }
+
+checks:
+  - name:
+      en: "exports stockLabel"
+      es: "exporta stockLabel"
+    expect:
+      exports:
+        entry: "src/stock.ts"
+        export: "stockLabel"
+
+  - name:
+      en: "stockLabel resolves to the SKU line"
+      es: "stockLabel resuelve a la línea de SKU"
+    expect:
+      returns:
+        entry: "src/stock.ts"
+        export: "stockLabel"
+        args: ["sku-1"]
+        equals: "SKU sku-1: 3 left"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/stock.ts b64:ZnVuY3Rpb24gZmV0Y2hTdG9jayhza3U6IHN0cmluZyk6IFByb21pc2U8bnVtYmVyPiB7CiAgcmV0dXJuIFByb21pc2UucmVzb2x2ZShza3UgPT09ICdza3UtMScgPyAzIDogMCkKfQoKZXhwb3J0IGZ1bmN0aW9uIHN0b2NrTGFiZWwoc2t1OiBzdHJpbmcpOiBQcm9taXNlPHN0cmluZz4gewogIHJldHVybiBmZXRjaFN0b2NrKHNrdSkudGhlbigocXR5KSA9PiAnU0tVICcgKyBza3UgKyAnOiAnICsgcXR5ICsgJyBsZWZ0JykKfQo=

@@ -13,15 +13,48 @@ import theVanishedFile from './git/the-vanished-file/index.ts'
 import timeMachineRecovery from './git/time-machine-recovery/index.ts'
 import tipBelongsOnFeature from './git/tip-belongs-on-feature/index.ts'
 import wrongBranchWetPaint from './git/wrong-branch-wet-paint/index.ts'
-import brokenTip from './ts/broken-tip/index.ts'
+import tipJarLies from './ts/tip-jar-lies/index.ts'
+import freeShippingGate from './ts/free-shipping-gate/index.ts'
+import cartThatLies from './ts/cart-that-lies/index.ts'
+import stringlyId from './ts/stringly-id/index.ts'
+import maybeNull from './ts/maybe-null/index.ts'
+import listBleed from './ts/list-bleed/index.ts'
+import configBleed from './ts/config-bleed/index.ts'
+import weekendRate from './ts/weekend-rate/index.ts'
+import makeTheDoc from './ts/make-the-doc/index.ts'
+import pipeIt from './ts/pipe-it/index.ts'
+import pendingReceipt from './ts/pending-receipt/index.ts'
+import thenChain from './ts/then-chain/index.ts'
+import forgotToAwait from './ts/forgot-to-await/index.ts'
+import swallowThe500 from './ts/swallow-the-500/index.ts'
+import twoDoors from './ts/two-doors/index.ts'
+import oneClient from './ts/one-client/index.ts'
+import narrowTheStatus from './ts/narrow-the-status/index.ts'
+import stalePaint from './ts/stale-paint/index.ts'
 import { slugify } from './slug.ts'
 import type { Scenario, ScenarioSummary } from '../engine/types.ts'
 
-// Display order is curated easy to hard (concept progression, not alphabet).
-// Same-family scenarios stay spaced: restore path vs deleted; first branch
-// vs wet-paint; unstage inspect vs secret stakes. POC kind=ts follows the
-// git pack for now.
+// Full registry (git + ts). TS pack first (concept ladder), then git.
+// Pack selector / filter UI is a follow-up on the picker.
 export const scenarios: Scenario[] = [
+  tipJarLies,
+  freeShippingGate,
+  cartThatLies,
+  stringlyId,
+  maybeNull,
+  listBleed,
+  configBleed,
+  weekendRate,
+  makeTheDoc,
+  pipeIt,
+  pendingReceipt,
+  thenChain,
+  forgotToAwait,
+  swallowThe500,
+  twoDoors,
+  oneClient,
+  narrowTheStatus,
+  stalePaint,
   saveYourWork,
   takeItBack,
   notOnMain,
@@ -37,7 +70,6 @@ export const scenarios: Scenario[] = [
   tipBelongsOnFeature,
   timeMachineRecovery,
   halfDeleted,
-  brokenTip,
 ]
 
 export function getScenario(id: string): Scenario | undefined {

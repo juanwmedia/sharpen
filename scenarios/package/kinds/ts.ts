@@ -6,7 +6,7 @@ import type {
   ScenarioAssertContext,
   ScenarioSetupEnv,
 } from '../../../engine/types.ts'
-import { callExport, hasNamedExport } from '../../../engine/ts-runtime.ts'
+import { callExport, hasNamedExport, loadExport, valuesEqual } from '../../../engine/ts-runtime.ts'
 import type { ParsedScenarioMd } from '../types.ts'
 import { DEFAULT_TIME_LIMIT_MS } from '../types.ts'
 
@@ -32,6 +32,41 @@ type CheckSpec =
       export: string
       args: unknown[]
       equals: unknown
+    }
+  | {
+      predicate: 'rejects'
+      entry: string
+      export: string
+      args: unknown[]
+      /** Substring that must appear in the rejection / throw message. */
+      messageIncludes?: string
+    }
+  | {
+      /** Engine-owned: call export, mutate a key on the object, call again, compare. */
+      predicate: 'stableAfterMutate'
+      entry: string
+      export: string
+      args: unknown[]
+      mutateKey: string
+      mutateValue: unknown
+      rereadKey: string
+      equals: unknown
+    }
+  | {
+      /** Engine-owned: two calls with the same args must return the same reference. */
+      predicate: 'sameRef'
+      entry: string
+      export: string
+      args: unknown[]
+    }
+  | {
+      /** Engine-owned: push onto returned array, call again; store length must hold. */
+      predicate: 'arrayPushStable'
+      entry: string
+      export: string
+      args: unknown[]
+      pushValue: unknown
+      lengthEquals: number
     }
   | { predicate: 'file'; path: string; contentEquals: string }
 
@@ -151,6 +186,131 @@ function parseCheckSpec(raw: unknown, at: string): CheckSpec {
         equals: v.equals,
       }
     }
+    case 'rejects': {
+      const v = value as {
+        entry?: unknown
+        export?: unknown
+        args?: unknown
+        messageIncludes?: unknown
+      } | null
+      if (
+        !v ||
+        typeof v !== 'object' ||
+        typeof v.entry !== 'string' ||
+        !v.entry ||
+        typeof v.export !== 'string' ||
+        !v.export
+      ) {
+        throw new Error(`${at}: expect.rejects needs { entry, export, args?, messageIncludes? }`)
+      }
+      const args = v.args === undefined ? [] : v.args
+      if (!Array.isArray(args)) throw new Error(`${at}: expect.rejects.args must be a list`)
+      if (v.messageIncludes !== undefined && typeof v.messageIncludes !== 'string') {
+        throw new Error(`${at}: expect.rejects.messageIncludes must be a string`)
+      }
+      return {
+        predicate: 'rejects',
+        entry: v.entry,
+        export: v.export,
+        args,
+        ...(typeof v.messageIncludes === 'string' ? { messageIncludes: v.messageIncludes } : {}),
+      }
+    }
+    case 'stableAfterMutate': {
+      const v = value as {
+        entry?: unknown
+        export?: unknown
+        args?: unknown
+        mutateKey?: unknown
+        mutateValue?: unknown
+        rereadKey?: unknown
+        equals?: unknown
+      } | null
+      if (
+        !v ||
+        typeof v !== 'object' ||
+        typeof v.entry !== 'string' ||
+        !v.entry ||
+        typeof v.export !== 'string' ||
+        !v.export ||
+        typeof v.mutateKey !== 'string' ||
+        !v.mutateKey ||
+        typeof v.rereadKey !== 'string' ||
+        !v.rereadKey ||
+        !('mutateValue' in v) ||
+        !('equals' in v)
+      ) {
+        throw new Error(
+          `${at}: expect.stableAfterMutate needs { entry, export, mutateKey, mutateValue, rereadKey, equals, args? }`
+        )
+      }
+      const args = v.args === undefined ? [] : v.args
+      if (!Array.isArray(args)) {
+        throw new Error(`${at}: expect.stableAfterMutate.args must be a list`)
+      }
+      return {
+        predicate: 'stableAfterMutate',
+        entry: v.entry,
+        export: v.export,
+        args,
+        mutateKey: v.mutateKey,
+        mutateValue: v.mutateValue,
+        rereadKey: v.rereadKey,
+        equals: v.equals,
+      }
+    }
+    case 'sameRef': {
+      const v = value as { entry?: unknown; export?: unknown; args?: unknown } | null
+      if (
+        !v ||
+        typeof v !== 'object' ||
+        typeof v.entry !== 'string' ||
+        !v.entry ||
+        typeof v.export !== 'string' ||
+        !v.export
+      ) {
+        throw new Error(`${at}: expect.sameRef needs { entry, export, args? }`)
+      }
+      const args = v.args === undefined ? [] : v.args
+      if (!Array.isArray(args)) throw new Error(`${at}: expect.sameRef.args must be a list`)
+      return { predicate: 'sameRef', entry: v.entry, export: v.export, args }
+    }
+    case 'arrayPushStable': {
+      const v = value as {
+        entry?: unknown
+        export?: unknown
+        args?: unknown
+        pushValue?: unknown
+        lengthEquals?: unknown
+      } | null
+      if (
+        !v ||
+        typeof v !== 'object' ||
+        typeof v.entry !== 'string' ||
+        !v.entry ||
+        typeof v.export !== 'string' ||
+        !v.export ||
+        !('pushValue' in v) ||
+        typeof v.lengthEquals !== 'number' ||
+        !Number.isFinite(v.lengthEquals)
+      ) {
+        throw new Error(
+          `${at}: expect.arrayPushStable needs { entry, export, pushValue, lengthEquals, args? }`
+        )
+      }
+      const args = v.args === undefined ? [] : v.args
+      if (!Array.isArray(args)) {
+        throw new Error(`${at}: expect.arrayPushStable.args must be a list`)
+      }
+      return {
+        predicate: 'arrayPushStable',
+        entry: v.entry,
+        export: v.export,
+        args,
+        pushValue: v.pushValue,
+        lengthEquals: v.lengthEquals,
+      }
+    }
     case 'file': {
       const v = value as { path?: unknown; contentEquals?: unknown } | null
       if (
@@ -166,7 +326,7 @@ function parseCheckSpec(raw: unknown, at: string): CheckSpec {
     }
     default:
       throw new Error(
-        `${at}: unknown predicate "${predicate}"; this engine supports: exports, returns, file`
+        `${at}: unknown predicate "${predicate}"; this engine supports: exports, returns, rejects, stableAfterMutate, sameRef, arrayPushStable, file`
       )
   }
 }
@@ -178,10 +338,6 @@ function parseCheck(raw: unknown, index: number): ScenarioCheck {
   }
   const v = raw as { name?: unknown; expect?: unknown }
   return { name: parseLocalized(v.name, at), spec: parseCheckSpec(v.expect, at) }
-}
-
-function sameValue(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b)
 }
 
 async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): Promise<Check> {
@@ -215,7 +371,7 @@ async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): 
           },
         }
       }
-      const pass = sameValue(result.value, spec.equals)
+      const pass = valuesEqual(result.value, spec.equals)
       return {
         name: check.name,
         pass,
@@ -227,6 +383,238 @@ async function evaluateCheck(check: ScenarioCheck, ctx: ScenarioAssertContext): 
           : {
               en: `${spec.export} returned ${JSON.stringify(result.value)} (expected ${JSON.stringify(spec.equals)})`,
               es: `${spec.export} devolvió ${JSON.stringify(result.value)} (esperado ${JSON.stringify(spec.equals)})`,
+            },
+      }
+    }
+    case 'rejects': {
+      const result = await callExport(ctx.fs, ctx.dir, spec.entry, spec.export, spec.args)
+      if (result.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export} resolved to ${JSON.stringify(result.value)} (expected a rejection)`,
+            es: `${spec.export} resolvió a ${JSON.stringify(result.value)} (se esperaba un rechazo)`,
+          },
+        }
+      }
+      if (result.reason === 'harness') {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${result.error}`,
+            es: `${spec.export}(...): ${result.error}`,
+          },
+        }
+      }
+      const msgOk =
+        spec.messageIncludes === undefined || result.error.includes(spec.messageIncludes)
+      return {
+        name: check.name,
+        pass: msgOk,
+        detail: msgOk
+          ? {
+              en: `${spec.export} rejected: ${result.error}`,
+              es: `${spec.export} rechazó: ${result.error}`,
+            }
+          : {
+              en: `${spec.export} rejected with ${JSON.stringify(result.error)} (expected message to include ${JSON.stringify(spec.messageIncludes)})`,
+              es: `${spec.export} rechazó con ${JSON.stringify(result.error)} (se esperaba que el mensaje incluyera ${JSON.stringify(spec.messageIncludes)})`,
+            },
+      }
+    }
+    case 'stableAfterMutate': {
+      // Same module instance for mutate + re-read (a fresh load would hide bleeds).
+      const loaded = await loadExport(ctx.fs, ctx.dir, spec.entry, spec.export)
+      if (!loaded.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${loaded.error}`,
+            es: `${spec.export}(...): ${loaded.error}`,
+          },
+        }
+      }
+      const first = await loaded.call(...spec.args)
+      if (!first.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${first.error}`,
+            es: `${spec.export}(...): ${first.error}`,
+          },
+        }
+      }
+      if (first.value === null || typeof first.value !== 'object' || Array.isArray(first.value)) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export} did not return a mutable object`,
+            es: `${spec.export} no devolvió un objeto mutable`,
+          },
+        }
+      }
+      ;(first.value as Record<string, unknown>)[spec.mutateKey] = spec.mutateValue
+      const second = await loaded.call(...spec.args)
+      if (!second.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${second.error}`,
+            es: `${spec.export}(...): ${second.error}`,
+          },
+        }
+      }
+      if (second.value === null || typeof second.value !== 'object' || Array.isArray(second.value)) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export} did not return an object on re-read`,
+            es: `${spec.export} no devolvió un objeto al releer`,
+          },
+        }
+      }
+      const got = (second.value as Record<string, unknown>)[spec.rereadKey]
+      const pass = valuesEqual(got, spec.equals)
+      return {
+        name: check.name,
+        pass,
+        detail: pass
+          ? {
+              en: `${spec.export}.${spec.rereadKey} stayed ${JSON.stringify(spec.equals)} after mutate`,
+              es: `${spec.export}.${spec.rereadKey} siguió en ${JSON.stringify(spec.equals)} tras mutar`,
+            }
+          : {
+              en: `${spec.export}.${spec.rereadKey} is ${JSON.stringify(got)} after mutate (expected ${JSON.stringify(spec.equals)})`,
+              es: `${spec.export}.${spec.rereadKey} es ${JSON.stringify(got)} tras mutar (esperado ${JSON.stringify(spec.equals)})`,
+            },
+      }
+    }
+    case 'sameRef': {
+      const loaded = await loadExport(ctx.fs, ctx.dir, spec.entry, spec.export)
+      if (!loaded.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${loaded.error}`,
+            es: `${spec.export}(...): ${loaded.error}`,
+          },
+        }
+      }
+      const a = await loaded.call(...spec.args)
+      const b = await loaded.call(...spec.args)
+      if (!a.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${a.error}`,
+            es: `${spec.export}(...): ${a.error}`,
+          },
+        }
+      }
+      if (!b.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${b.error}`,
+            es: `${spec.export}(...): ${b.error}`,
+          },
+        }
+      }
+      const pass = Object.is(a.value, b.value)
+      return {
+        name: check.name,
+        pass,
+        detail: pass
+          ? {
+              en: `two ${spec.export}() calls return the same reference`,
+              es: `dos llamadas a ${spec.export}() devuelven la misma referencia`,
+            }
+          : {
+              en: `two ${spec.export}() calls return different references`,
+              es: `dos llamadas a ${spec.export}() devuelven referencias distintas`,
+            },
+      }
+    }
+    case 'arrayPushStable': {
+      // Same module instance: push onto the returned array, then re-call.
+      const loaded = await loadExport(ctx.fs, ctx.dir, spec.entry, spec.export)
+      if (!loaded.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${loaded.error}`,
+            es: `${spec.export}(...): ${loaded.error}`,
+          },
+        }
+      }
+      const first = await loaded.call(...spec.args)
+      if (!first.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${first.error}`,
+            es: `${spec.export}(...): ${first.error}`,
+          },
+        }
+      }
+      if (!Array.isArray(first.value)) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export} did not return an array`,
+            es: `${spec.export} no devolvió un array`,
+          },
+        }
+      }
+      first.value.push(spec.pushValue)
+      const second = await loaded.call(...spec.args)
+      if (!second.ok) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export}(...): ${second.error}`,
+            es: `${spec.export}(...): ${second.error}`,
+          },
+        }
+      }
+      if (!Array.isArray(second.value)) {
+        return {
+          name: check.name,
+          pass: false,
+          detail: {
+            en: `${spec.export} did not return an array on re-read`,
+            es: `${spec.export} no devolvió un array al releer`,
+          },
+        }
+      }
+      const lengthOk = second.value.length === spec.lengthEquals
+      const leakOk = !second.value.some((item) => valuesEqual(item, spec.pushValue))
+      const pass = lengthOk && leakOk
+      return {
+        name: check.name,
+        pass,
+        detail: pass
+          ? {
+              en: `${spec.export} stayed length ${spec.lengthEquals} after push`,
+              es: `${spec.export} siguió con length ${spec.lengthEquals} tras el push`,
+            }
+          : {
+              en: `${spec.export} re-read length ${second.value.length} (expected ${spec.lengthEquals}, no leaked ${JSON.stringify(spec.pushValue)})`,
+              es: `${spec.export} al releer length ${second.value.length} (esperado ${spec.lengthEquals}, sin filtrar ${JSON.stringify(spec.pushValue)})`,
             },
       }
     }
@@ -309,7 +697,7 @@ function parseTsSpec(spec: Record<string, unknown> | undefined): { tree: string;
   }
   if (spec.probe !== undefined) {
     throw new Error(
-      'scenario.md: kind "ts" no longer takes spec.probe; Run uses the first expect.returns check on spec.entry'
+      'scenario.md: kind "ts" no longer takes spec.probe; Run uses the first returns/rejects check on spec.entry'
     )
   }
   return {
@@ -318,22 +706,30 @@ function parseTsSpec(spec: Record<string, unknown> | undefined): { tree: string;
   }
 }
 
-/** Default Run / Monaco probe: first returns check on the entry file. */
+/** Default Run / Monaco probe: first returns (else rejects) check on the entry. */
 function deriveTsProbe(
   entry: string,
   checks: ScenarioCheck[]
 ): { entry: string; exportName: string; args: unknown[] } {
-  const onEntry = checks.find((c) => c.spec.predicate === 'returns' && c.spec.entry === entry)
-  if (!onEntry || onEntry.spec.predicate !== 'returns') {
-    throw new Error(
-      `kind=ts: need at least one expect.returns check with entry "${entry}" (Run is derived from it)`
-    )
+  const returns = checks.find((c) => c.spec.predicate === 'returns' && c.spec.entry === entry)
+  if (returns && returns.spec.predicate === 'returns') {
+    return {
+      entry: returns.spec.entry,
+      exportName: returns.spec.export,
+      args: returns.spec.args,
+    }
   }
-  return {
-    entry: onEntry.spec.entry,
-    exportName: onEntry.spec.export,
-    args: onEntry.spec.args,
+  const rejects = checks.find((c) => c.spec.predicate === 'rejects' && c.spec.entry === entry)
+  if (rejects && rejects.spec.predicate === 'rejects') {
+    return {
+      entry: rejects.spec.entry,
+      exportName: rejects.spec.export,
+      args: rejects.spec.args,
+    }
   }
+  throw new Error(
+    `kind=ts: need at least one expect.returns or expect.rejects check with entry "${entry}" (Run is derived from it)`
+  )
 }
 
 export function assembleTsScenario(

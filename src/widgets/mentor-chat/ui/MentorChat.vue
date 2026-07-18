@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { MENTOR_ROLE, RUN_STATUS } from '@/entities/game/index.ts'
+import { MENTOR_ROLE, RUN_STATUS, useGame } from '@/entities/game/index.ts'
 import type { MentorItem, MentorRole, RunStatus } from '@/entities/game/index.ts'
 import {
   CHAT_FEED_MAX_HEIGHT_PX,
@@ -25,9 +25,11 @@ const props = defineProps<{
 const emit = defineEmits<{ ask: [question: string] }>()
 
 const { t } = useI18n()
+const { state } = useGame()
 const question = ref('')
 const feedEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLInputElement | null>(null)
+const idleKey = computed(() => (state.scenario?.kind === 'ts' ? 'chat.idleTs' : 'chat.idleGit'))
 
 // The page-level focus-swap shortcut drives these.
 defineExpose({
@@ -95,7 +97,7 @@ function send(): void {
       <p
         v-if="!feed.length"
         :class="`m-0 text-[15px] leading-relaxed text-muted ${INLINE_MD_CLASS}`"
-        v-html="renderInlineMd(t('chat.idle'))"
+        v-html="renderInlineMd(t(idleKey))"
       ></p>
       <div v-for="(item, i) in feed" :key="i" class="flex" :class="{ 'justify-end': isMine(item) }">
         <div

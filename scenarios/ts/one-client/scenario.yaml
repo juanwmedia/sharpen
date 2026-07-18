@@ -1,0 +1,48 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/db.ts
+      content: |
+        let seq = 0
+        
+        export type Client = { id: number }
+        
+        export function getClient(): Client {
+          // Fresh toy every time. The pool filed a restraining order.
+          seq += 1
+          return { id: seq }
+        }
+
+checks:
+  - name:
+      en: "exports getClient"
+      es: "exporta getClient"
+    expect:
+      exports:
+        entry: "src/db.ts"
+        export: "getClient"
+
+  - name:
+      en: "getClient returns a client"
+      es: "getClient devuelve un cliente"
+    expect:
+      returns:
+        entry: "src/db.ts"
+        export: "getClient"
+        args: []
+        equals: {"id":1}
+
+  - name:
+      en: "two getClient calls share a reference"
+      es: "dos getClient comparten referencia"
+    expect:
+      sameRef:
+        entry: "src/db.ts"
+        export: "getClient"
+        args: []
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/db.ts b64:bGV0IHNlcSA9IDAKbGV0IGNhY2hlZDogeyBpZDogbnVtYmVyIH0gfCBudWxsID0gbnVsbAoKZXhwb3J0IHR5cGUgQ2xpZW50ID0geyBpZDogbnVtYmVyIH0KCmV4cG9ydCBmdW5jdGlvbiBnZXRDbGllbnQoKTogQ2xpZW50IHsKICBpZiAoIWNhY2hlZCkgewogICAgc2VxICs9IDEKICAgIGNhY2hlZCA9IHsgaWQ6IHNlcSB9CiAgfQogIHJldHVybiBjYWNoZWQKfQo=

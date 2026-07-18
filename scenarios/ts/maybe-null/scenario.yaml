@@ -1,0 +1,54 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/title.ts
+      content: |
+        export function pageTitle(page: { heading?: string } | null): string {
+          // Null throws. Empty string wrongly becomes Untitled.
+          return page.heading || 'Untitled'
+        }
+
+checks:
+  - name:
+      en: "exports pageTitle"
+      es: "exporta pageTitle"
+    expect:
+      exports:
+        entry: "src/title.ts"
+        export: "pageTitle"
+
+  - name:
+      en: "null page is Untitled"
+      es: "página null es Untitled"
+    expect:
+      returns:
+        entry: "src/title.ts"
+        export: "pageTitle"
+        args: [null]
+        equals: "Untitled"
+
+  - name:
+      en: "empty heading stays empty"
+      es: "heading vacío se queda vacío"
+    expect:
+      returns:
+        entry: "src/title.ts"
+        export: "pageTitle"
+        args: [{"heading":""}]
+        equals: ""
+
+  - name:
+      en: "heading Hi returns Hi"
+      es: "heading Hi devuelve Hi"
+    expect:
+      returns:
+        entry: "src/title.ts"
+        export: "pageTitle"
+        args: [{"heading":"Hi"}]
+        equals: "Hi"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/title.ts b64:ZXhwb3J0IGZ1bmN0aW9uIHBhZ2VUaXRsZShwYWdlOiB7IGhlYWRpbmc/OiBzdHJpbmcgfSB8IG51bGwpOiBzdHJpbmcgewogIHJldHVybiBwYWdlPy5oZWFkaW5nID8/ICdVbnRpdGxlZCcKfQo=

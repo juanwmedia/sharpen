@@ -1,0 +1,44 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/ledger.ts
+      content: |
+        export function bumpAmount(id: string, delta: number): number | null {
+          // String concat in a money path. Classic.
+          return (id as unknown as number) + delta
+        }
+
+checks:
+  - name:
+      en: "exports bumpAmount"
+      es: "exporta bumpAmount"
+    expect:
+      exports:
+        entry: "src/ledger.ts"
+        export: "bumpAmount"
+
+  - name:
+      en: "numeric id bumps by delta"
+      es: "id numérico suma el delta"
+    expect:
+      returns:
+        entry: "src/ledger.ts"
+        export: "bumpAmount"
+        args: ["1042",10]
+        equals: 1052
+
+  - name:
+      en: "garbage id returns null"
+      es: "id basura devuelve null"
+    expect:
+      returns:
+        entry: "src/ledger.ts"
+        export: "bumpAmount"
+        args: ["nope",10]
+        equals: null
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/ledger.ts b64:ZXhwb3J0IGZ1bmN0aW9uIGJ1bXBBbW91bnQoaWQ6IHN0cmluZywgZGVsdGE6IG51bWJlcik6IG51bWJlciB8IG51bGwgewogIGNvbnN0IG4gPSBOdW1iZXIoaWQpCiAgaWYgKCFOdW1iZXIuaXNGaW5pdGUobikpIHJldHVybiBudWxsCiAgcmV0dXJuIG4gKyBkZWx0YQp9Cg==

@@ -1,1 +1,0 @@
-`formatPrice` must divide cents by 100 before formatting. Press Run (or `run src/price.ts formatPrice 100`) while broken and you should see `"$100.00"`. Fix the body to `` `$${(cents / 100).toFixed(2)}` ``. The arena checks the return values of fixed calls; it does not care how you edited the file.

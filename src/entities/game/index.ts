@@ -5,6 +5,7 @@ export {
   readArenaFile,
   registerPromptRefresher,
   registerRunLostHandler,
+  registerStatusSink,
   registerTerminalWriter,
   runTsWorkspace,
   submit,

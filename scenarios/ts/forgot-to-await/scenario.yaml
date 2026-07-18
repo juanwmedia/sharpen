@@ -1,0 +1,39 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/greeter.ts
+      content: |
+        function fetchUser(id: number): Promise<{ name: string }> {
+          return Promise.resolve({ name: id === 7 ? 'Ada' : 'Anon' })
+        }
+        
+        export async function welcome(id: number): Promise<string> {
+          const user = fetchUser(id)
+          // user is a Promise. .name is undefined. The email went out anyway.
+          return `Welcome, ${(user as unknown as { name: string }).name}`
+        }
+
+checks:
+  - name:
+      en: "exports welcome"
+      es: "exporta welcome"
+    expect:
+      exports:
+        entry: "src/greeter.ts"
+        export: "welcome"
+
+  - name:
+      en: "welcome(7) greets Ada"
+      es: "welcome(7) saluda a Ada"
+    expect:
+      returns:
+        entry: "src/greeter.ts"
+        export: "welcome"
+        args: [7]
+        equals: "Welcome, Ada"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/greeter.ts b64:ZnVuY3Rpb24gZmV0Y2hVc2VyKGlkOiBudW1iZXIpOiBQcm9taXNlPHsgbmFtZTogc3RyaW5nIH0+IHsKICByZXR1cm4gUHJvbWlzZS5yZXNvbHZlKHsgbmFtZTogaWQgPT09IDcgPyAnQWRhJyA6ICdBbm9uJyB9KQp9CgpleHBvcnQgYXN5bmMgZnVuY3Rpb24gd2VsY29tZShpZDogbnVtYmVyKTogUHJvbWlzZTxzdHJpbmc+IHsKICBjb25zdCB1c2VyID0gYXdhaXQgZmV0Y2hVc2VyKGlkKQogIHJldHVybiAnV2VsY29tZSwgJyArIHVzZXIubmFtZQp9Cg==

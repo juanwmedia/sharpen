@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { assembleScenario } from '../scenarios/package/assemble.ts'
 import { parseGitMechanics } from '../scenarios/package/kinds/git.ts'
+import { parseTsMechanics } from '../scenarios/package/kinds/ts.ts'
 import { parseScenarioMd } from '../scenarios/package/parse-scenario-md.ts'
 import cleanSweep from '../scenarios/git/clean-sweep/index.ts'
 
@@ -211,5 +212,39 @@ difficulty: easy`,
     const mechanics = parseGitMechanics(readFileSync(join(packageDir, 'scenario.yaml'), 'utf8'))
     expect(mechanics.setup.length).toBeGreaterThan(5)
     expect(mechanics.checks).toHaveLength(4)
+  })
+
+  it('parses kind=ts isolation predicates', () => {
+    const mechanics = parseTsMechanics(`setup:
+  - write: { path: src/x.ts, content: "export function get() { return {} }" }
+checks:
+  - name: { en: same, es: misma }
+    expect: { sameRef: { entry: src/x.ts, export: get } }
+  - name: { en: stable, es: estable }
+    expect:
+      stableAfterMutate:
+        entry: src/x.ts
+        export: get
+        mutateKey: beta
+        mutateValue: true
+        rereadKey: beta
+        equals: false
+  - name: { en: push, es: push }
+    expect:
+      arrayPushStable:
+        entry: src/x.ts
+        export: get
+        args: []
+        pushValue: leak
+        lengthEquals: 2
+solution:
+  commands:
+    - writefile src/x.ts b64:eA==
+`)
+    expect(mechanics.checks.map((c) => c.spec.predicate)).toEqual([
+      'sameRef',
+      'stableAfterMutate',
+      'arrayPushStable',
+    ])
   })
 })

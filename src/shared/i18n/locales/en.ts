@@ -17,13 +17,13 @@ export default {
     challenge: 'challenge',
   },
   picker: {
-    eyebrow: 'git pack',
+    eyebrow: 'scenarios',
     title: 'Pick your scenario',
     done: 'Done',
     ledeLearn:
-      'No clock, a real repo in your browser, a Socratic mentor watching. Every {enter} validates: run a command and the arena judges the repo state it leaves behind. Reveal when you want the walkthrough.',
+      'No clock, a Socratic mentor watching. Git arenas judge the repo; TypeScript arenas judge what your exports return. Reveal when you want the walkthrough.',
     ledeChallenge:
-      '60 seconds on the clock, a real repo in your browser, a Socratic mentor watching. Every {enter} validates: run a command and the arena judges the repo state it leaves behind. Any correct solution passes.',
+      '60 seconds on the clock, a Socratic mentor watching. Git arenas judge the repo; TypeScript arenas judge what your exports return. Any correct solution passes.',
     meta: '{pack} · {difficulty} · {seconds}s',
     enterArena: '→ enter the arena',
   },
@@ -65,9 +65,9 @@ export default {
       '✗ "{check}": the uncommitted work this check needs was destroyed; git cannot bring it back. Wipe progress and run it again.',
     lostChallenge:
       '✗ "{check}": that uncommitted work is gone for good; this run can no longer go green. That is git.',
-    pin: 'Pin terminal (stays visible)',
-    unpin: 'Unpin terminal (scrolls with the page)',
-    solved: '✓ Scenario solved. The arena validated your repo state.',
+    pin: 'Pin (stays visible)',
+    unpin: 'Unpin (scrolls with the page)',
+    solved: '✓ Scenario solved. The arena validated the board.',
     notYetQuiet: '✗ not yet: {green}/{total} checks green',
     notYetLoud: '✗ Not yet. Check the verdict panel. The mentor has a hint.',
     alreadySolved: 'Already solved. Ask the mentor below, or go back for the next scenario.',
@@ -79,7 +79,10 @@ export default {
   },
   chat: {
     eyebrow: 'conversation',
-    idle: "Your commands and the mentor's replies land here as a conversation. While you practice the mentor only nudges, never spoils; after a reveal or a solve, it teaches. Commands live in the terminal, where `git <command> --help` tells you what this arena supports; this box is for the why.",
+    idleGit:
+      "Your commands and the mentor's replies land here as a conversation. While you practice the mentor only nudges, never spoils; after a reveal or a solve, it teaches. Commands live in the terminal, where `git <command> --help` tells you what this arena supports; this box is for the why.",
+    idleTs:
+      "Your attempts and the mentor's replies land here as a conversation. While you practice the mentor only nudges, never spoils; after a reveal or a solve, it teaches. Edits live in the workspace editor; Run asks the arena to judge export return values. This box is for the why.",
     placeholderLive: 'Ask for a nudge…',
     placeholderFree: 'Ask the mentor anything…',
     send: 'Send',
@@ -125,7 +128,7 @@ export default {
     note: 'The chat always answers you. Solving (and the timeout reveal) always speaks.',
   },
   shortcut: {
-    swap: 'Ctrl + the key above Tab (` or º) swaps focus between the terminal and the chat',
+    swap: 'Ctrl + the key above Tab (` or º) swaps focus between the practice pane and the chat',
   },
   verdict: {
     eyebrow: 'verdict',

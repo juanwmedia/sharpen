@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RUN_STATUS, useGame } from '@/entities/game/index.ts'
+import { registerStatusSink, RUN_STATUS, useGame } from '@/entities/game/index.ts'
 import { SWAP_SHORTCUT_LABEL, TS_RUN_SHORTCUT_LABEL } from '@/shared/config/index.ts'
 import { createMonacoEditor, loadMonaco, type MonacoHandle } from '@/shared/lib/monaco.ts'
 
@@ -73,6 +73,11 @@ async function seedFromArena(): Promise<void> {
 }
 
 onMounted(async () => {
+  registerStatusSink((kind, text) => {
+    consoleExpanded.value = true
+    pushLine(kind === 'ok' ? 'result' : kind === 'error' ? 'error' : 'log', text)
+    void scrollConsoleToBottom()
+  })
   if (!host.value) return
   try {
     await loadMonaco()
@@ -89,17 +94,19 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  registerStatusSink(null)
   seedGeneration++
   monaco?.dispose()
   monaco = null
 })
 
-// Wipe / new run: same component instance (keyed by scenario id); reseed when
-// the arena is live again.
+// Wipe / new run: reseed on runId only. Do not clear on pass/reveal or the
+// solve line from registerStatusSink disappears.
 watch(
-  () => [state.runId, state.status] as const,
-  ([runId, status]) => {
-    if (!runId || (status !== RUN_STATUS.live && status !== RUN_STATUS.passed && status !== RUN_STATUS.revealed)) {
+  () => state.runId,
+  (runId) => {
+    if (!runId) return
+    if (state.status !== RUN_STATUS.live && state.status !== RUN_STATUS.passed && state.status !== RUN_STATUS.revealed) {
       return
     }
     clearConsole()

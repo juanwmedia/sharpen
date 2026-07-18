@@ -1,0 +1,44 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/tip.ts
+      content: |
+        export function formatTip(cents: number): string {
+          // Someone shipped cents as dollars. Payroll is already angry.
+          return `$${cents.toFixed(2)}`
+        }
+
+checks:
+  - name:
+      en: "exports formatTip"
+      es: "exporta formatTip"
+    expect:
+      exports:
+        entry: "src/tip.ts"
+        export: "formatTip"
+
+  - name:
+      en: "formatTip(100) returns $1.00"
+      es: "formatTip(100) devuelve $1.00"
+    expect:
+      returns:
+        entry: "src/tip.ts"
+        export: "formatTip"
+        args: [100]
+        equals: "$1.00"
+
+  - name:
+      en: "formatTip(0) returns $0.00"
+      es: "formatTip(0) devuelve $0.00"
+    expect:
+      returns:
+        entry: "src/tip.ts"
+        export: "formatTip"
+        args: [0]
+        equals: "$0.00"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/tip.ts b64:ZXhwb3J0IGZ1bmN0aW9uIGZvcm1hdFRpcChjZW50czogbnVtYmVyKTogc3RyaW5nIHsKICByZXR1cm4gJyQnICsgKGNlbnRzIC8gMTAwKS50b0ZpeGVkKDIpCn0K

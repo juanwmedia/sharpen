@@ -1,0 +1,52 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/dashboard.ts
+      content: |
+        let prefsStarted = false
+        
+        function fetchUser(): Promise<string> {
+          return Promise.resolve().then(() => {
+            if (!prefsStarted) {
+              throw new Error('user waited on prefs: start both')
+            }
+            return 'Ada'
+          })
+        }
+        
+        function fetchPrefs(): Promise<string> {
+          prefsStarted = true
+          return Promise.resolve('dark')
+        }
+        
+        export async function loadHome(): Promise<{ user: string; theme: string }> {
+          // Sequential await never starts prefs before user runs. Boom.
+          const user = await fetchUser()
+          const theme = await fetchPrefs()
+          return { user, theme }
+        }
+
+checks:
+  - name:
+      en: "exports loadHome"
+      es: "exporta loadHome"
+    expect:
+      exports:
+        entry: "src/dashboard.ts"
+        export: "loadHome"
+
+  - name:
+      en: "loadHome joins user and theme"
+      es: "loadHome junta user y theme"
+    expect:
+      returns:
+        entry: "src/dashboard.ts"
+        export: "loadHome"
+        args: []
+        equals: {"user":"Ada","theme":"dark"}
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/dashboard.ts b64:bGV0IHByZWZzU3RhcnRlZCA9IGZhbHNlCgpmdW5jdGlvbiBmZXRjaFVzZXIoKTogUHJvbWlzZTxzdHJpbmc+IHsKICByZXR1cm4gUHJvbWlzZS5yZXNvbHZlKCkudGhlbigoKSA9PiB7CiAgICBpZiAoIXByZWZzU3RhcnRlZCkgewogICAgICB0aHJvdyBuZXcgRXJyb3IoJ3VzZXIgd2FpdGVkIG9uIHByZWZzOiBzdGFydCBib3RoJykKICAgIH0KICAgIHJldHVybiAnQWRhJwogIH0pCn0KCmZ1bmN0aW9uIGZldGNoUHJlZnMoKTogUHJvbWlzZTxzdHJpbmc+IHsKICBwcmVmc1N0YXJ0ZWQgPSB0cnVlCiAgcmV0dXJuIFByb21pc2UucmVzb2x2ZSgnZGFyaycpCn0KCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBsb2FkSG9tZSgpOiBQcm9taXNlPHsgdXNlcjogc3RyaW5nOyB0aGVtZTogc3RyaW5nIH0+IHsKICBjb25zdCBbdXNlciwgdGhlbWVdID0gYXdhaXQgUHJvbWlzZS5hbGwoW2ZldGNoVXNlcigpLCBmZXRjaFByZWZzKCldKQogIHJldHVybiB7IHVzZXIsIHRoZW1lIH0KfQo=

@@ -1,0 +1,47 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/search.ts
+      content: |
+        let paint = 'empty'
+        
+        function fetchName(req: number): Promise<string> {
+          if (req === 1) return Promise.resolve().then(() => 'Ada')
+          return Promise.resolve('Bob')
+        }
+        
+        export async function paintNames(): Promise<string> {
+          const p1 = fetchName(1).then((n) => {
+            paint = n
+          })
+          const p2 = fetchName(2).then((n) => {
+            paint = n
+          })
+          await Promise.all([p1, p2])
+          return paint
+        }
+
+checks:
+  - name:
+      en: "exports paintNames"
+      es: "exporta paintNames"
+    expect:
+      exports:
+        entry: "src/search.ts"
+        export: "paintNames"
+
+  - name:
+      en: "paintNames resolves to Bob"
+      es: "paintNames resuelve a Bob"
+    expect:
+      returns:
+        entry: "src/search.ts"
+        export: "paintNames"
+        args: []
+        equals: "Bob"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/search.ts b64:ZnVuY3Rpb24gZmV0Y2hOYW1lKHJlcTogbnVtYmVyKTogUHJvbWlzZTxzdHJpbmc+IHsKICBpZiAocmVxID09PSAxKSByZXR1cm4gUHJvbWlzZS5yZXNvbHZlKCkudGhlbigoKSA9PiAnQWRhJykKICByZXR1cm4gUHJvbWlzZS5yZXNvbHZlKCdCb2InKQp9CgpleHBvcnQgYXN5bmMgZnVuY3Rpb24gcGFpbnROYW1lcygpOiBQcm9taXNlPHN0cmluZz4gewogIGxldCBsYXRlc3RSZXEgPSAwCiAgbGV0IHBhaW50ID0gJ2VtcHR5JwogIGNvbnN0IHJ1biA9IGFzeW5jIChyZXE6IG51bWJlcikgPT4gewogICAgbGF0ZXN0UmVxID0gcmVxCiAgICBjb25zdCBuID0gYXdhaXQgZmV0Y2hOYW1lKHJlcSkKICAgIGlmIChyZXEgPT09IGxhdGVzdFJlcSkgcGFpbnQgPSBuCiAgfQogIGF3YWl0IFByb21pc2UuYWxsKFtydW4oMSksIHJ1bigyKV0pCiAgcmV0dXJuIHBhaW50Cn0K

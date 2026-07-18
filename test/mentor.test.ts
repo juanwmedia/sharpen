@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 import cleanSweep from '../scenarios/git/clean-sweep/index.ts'
+import tipJar from '../scenarios/ts/tip-jar-lies/index.ts'
 import { MENTOR_BUBBLE } from '../engine/types.ts'
 import {
   buildMentorPrompt,
@@ -371,9 +372,32 @@ describe('buildMentorPrompt', () => {
     expect(prompt).toContain(MENTOR_PROMPT.repoBoard)
     expect(prompt).toContain('untracked: build.log')
     expect(prompt).toContain(MENTOR_PROMPT.nothingTyped)
+    expect(prompt).toContain(MENTOR_PROMPT.transcriptTerminal)
     expect(prompt).toContain('hola')
     expect(prompt).not.toContain(cleanSweep.walkthrough.slice(0, 30))
     expect(prompt).not.toContain(MENTOR_PROMPT.walkthrough)
+  })
+
+  it('TS runs label the workspace transcript and redact writefile b64', () => {
+    const prompt = buildMentorPrompt({
+      phase: MENTOR_PHASE.open,
+      trigger: MENTOR_TRIGGER.submitFail,
+      scenario: tipJar,
+      board: 'files: src/tip.ts',
+      transcript: [
+        {
+          command: 'writefile src/tip.ts b64:YWJjZGVmZ2g=',
+          output: '',
+        },
+        { command: 'run src/tip.ts formatTip 100', output: '=> "$1.00"' },
+      ],
+      checks: [],
+      clockSec: 30,
+    })
+    expect(prompt).toContain(MENTOR_PROMPT.transcriptWorkspace)
+    expect(prompt).toContain('writefile src/tip.ts (edited, 12 b64 chars)')
+    expect(prompt).not.toContain('b64:YWJj')
+    expect(prompt).toContain('$ run src/tip.ts formatTip 100')
   })
 
   it('Open + submitFail includes failed checks and board', () => {

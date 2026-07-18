@@ -1,0 +1,46 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/result.ts
+      content: |
+        export type Result = { ok: true; value: string } | { ok: false; error: string }
+        
+        export function describe(result: Result): string {
+          // No narrowing. Error path reads .value and invents "ok:undefined".
+          return 'ok:' + (result as { value: string }).value
+        }
+
+checks:
+  - name:
+      en: "exports describe"
+      es: "exporta describe"
+    expect:
+      exports:
+        entry: "src/result.ts"
+        export: "describe"
+
+  - name:
+      en: "ok branch formats value"
+      es: "rama ok formatea value"
+    expect:
+      returns:
+        entry: "src/result.ts"
+        export: "describe"
+        args: [{"ok":true,"value":"x"}]
+        equals: "ok:x"
+
+  - name:
+      en: "err branch formats error"
+      es: "rama err formatea error"
+    expect:
+      returns:
+        entry: "src/result.ts"
+        export: "describe"
+        args: [{"ok":false,"error":"boom"}]
+        equals: "err:boom"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/result.ts b64:ZXhwb3J0IHR5cGUgUmVzdWx0ID0geyBvazogdHJ1ZTsgdmFsdWU6IHN0cmluZyB9IHwgeyBvazogZmFsc2U7IGVycm9yOiBzdHJpbmcgfQoKZXhwb3J0IGZ1bmN0aW9uIGRlc2NyaWJlKHJlc3VsdDogUmVzdWx0KTogc3RyaW5nIHsKICBpZiAocmVzdWx0Lm9rKSByZXR1cm4gJ29rOicgKyByZXN1bHQudmFsdWUKICByZXR1cm4gJ2VycjonICsgcmVzdWx0LmVycm9yCn0K

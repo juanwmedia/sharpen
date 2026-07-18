@@ -81,6 +81,7 @@ function mentorFor(run: Run): Mentor {
   if (!run.mentor) {
     run.mentor = new Mentor({
       locale: run.locale,
+      scenarioKind: run.scenario.kind,
       sessionId: run.mentorSessionId,
       turns: run.mentorTurns,
       onDelta: (text, bubble) => runs.emit(run, ARENA_EVENT.mentorDelta, { text, bubble }),

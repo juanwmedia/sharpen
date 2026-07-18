@@ -1,0 +1,57 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/pipeline.ts
+      content: |
+        export function parse(raw: string): string {
+          return raw.trim()
+        }
+        
+        export function validate(s: string): string | null {
+          return /^\d+$/.test(s) ? s : null
+        }
+        
+        export function format(s: string): string {
+          return 'VAL:' + s
+        }
+        
+        export function processInput(raw: string): string | null {
+          // Skips validate. Garbage in, garbage proudly out.
+          const s = parse(raw)
+          return format(s)
+        }
+
+checks:
+  - name:
+      en: "exports processInput"
+      es: "exporta processInput"
+    expect:
+      exports:
+        entry: "src/pipeline.ts"
+        export: "processInput"
+
+  - name:
+      en: "valid input formats"
+      es: "input válido formatea"
+    expect:
+      returns:
+        entry: "src/pipeline.ts"
+        export: "processInput"
+        args: ["  42  "]
+        equals: "VAL:42"
+
+  - name:
+      en: "invalid input is null"
+      es: "input inválido es null"
+    expect:
+      returns:
+        entry: "src/pipeline.ts"
+        export: "processInput"
+        args: ["nope"]
+        equals: null
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/pipeline.ts b64:ZXhwb3J0IGZ1bmN0aW9uIHBhcnNlKHJhdzogc3RyaW5nKTogc3RyaW5nIHsKICByZXR1cm4gcmF3LnRyaW0oKQp9CgpleHBvcnQgZnVuY3Rpb24gdmFsaWRhdGUoczogc3RyaW5nKTogc3RyaW5nIHwgbnVsbCB7CiAgcmV0dXJuIC9eXGQrJC8udGVzdChzKSA/IHMgOiBudWxsCn0KCmV4cG9ydCBmdW5jdGlvbiBmb3JtYXQoczogc3RyaW5nKTogc3RyaW5nIHsKICByZXR1cm4gJ1ZBTDonICsgcwp9CgpleHBvcnQgZnVuY3Rpb24gcHJvY2Vzc0lucHV0KHJhdzogc3RyaW5nKTogc3RyaW5nIHwgbnVsbCB7CiAgY29uc3QgcyA9IHBhcnNlKHJhdykKICBjb25zdCB2ID0gdmFsaWRhdGUocykKICBpZiAodiA9PT0gbnVsbCkgcmV0dXJuIG51bGwKICByZXR1cm4gZm9ybWF0KHYpCn0K

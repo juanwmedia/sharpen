@@ -1,0 +1,46 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/docs.ts
+      content: |
+        export type Kind = 'invoice' | 'credit'
+        
+        export function makeDoc(kind: Kind, amount: number): { type: Kind; total: number } {
+          // Credits still invoice. Accounting has screenshots.
+          return { type: 'invoice', total: amount }
+        }
+
+checks:
+  - name:
+      en: "exports makeDoc"
+      es: "exporta makeDoc"
+    expect:
+      exports:
+        entry: "src/docs.ts"
+        export: "makeDoc"
+
+  - name:
+      en: "invoice keeps positive total"
+      es: "invoice mantiene total positivo"
+    expect:
+      returns:
+        entry: "src/docs.ts"
+        export: "makeDoc"
+        args: ["invoice",10]
+        equals: {"type":"invoice","total":10}
+
+  - name:
+      en: "credit negates total"
+      es: "credit niega el total"
+    expect:
+      returns:
+        entry: "src/docs.ts"
+        export: "makeDoc"
+        args: ["credit",10]
+        equals: {"type":"credit","total":-10}
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/docs.ts b64:ZXhwb3J0IHR5cGUgS2luZCA9ICdpbnZvaWNlJyB8ICdjcmVkaXQnCgpleHBvcnQgZnVuY3Rpb24gbWFrZURvYyhraW5kOiBLaW5kLCBhbW91bnQ6IG51bWJlcik6IHsgdHlwZTogS2luZDsgdG90YWw6IG51bWJlciB9IHsKICBpZiAoa2luZCA9PT0gJ2NyZWRpdCcpIHJldHVybiB7IHR5cGU6ICdjcmVkaXQnLCB0b3RhbDogLU1hdGguYWJzKGFtb3VudCkgfQogIHJldHVybiB7IHR5cGU6ICdpbnZvaWNlJywgdG90YWw6IGFtb3VudCB9Cn0K

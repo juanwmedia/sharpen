@@ -1,0 +1,46 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/cart.ts
+      content: |
+        export type Line = { priceCents: number; qty: number }
+        
+        export function cartTotal(lines: Line[]): number {
+          // qty is ignored. That is the bug, not a feature.
+          return lines.reduce((sum, line) => sum + line.priceCents, 0)
+        }
+
+checks:
+  - name:
+      en: "exports cartTotal"
+      es: "exporta cartTotal"
+    expect:
+      exports:
+        entry: "src/cart.ts"
+        export: "cartTotal"
+
+  - name:
+      en: "two lines with qty total 350"
+      es: "dos líneas con qty suman 350"
+    expect:
+      returns:
+        entry: "src/cart.ts"
+        export: "cartTotal"
+        args: [[{"priceCents":100,"qty":2},{"priceCents":50,"qty":3}]]
+        equals: 350
+
+  - name:
+      en: "empty cart is 0"
+      es: "carrito vacío es 0"
+    expect:
+      returns:
+        entry: "src/cart.ts"
+        export: "cartTotal"
+        args: [[]]
+        equals: 0
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/cart.ts b64:ZXhwb3J0IHR5cGUgTGluZSA9IHsgcHJpY2VDZW50czogbnVtYmVyOyBxdHk6IG51bWJlciB9CgpleHBvcnQgZnVuY3Rpb24gY2FydFRvdGFsKGxpbmVzOiBMaW5lW10pOiBudW1iZXIgewogIHJldHVybiBsaW5lcy5yZWR1Y2UoKHN1bSwgbGluZSkgPT4gc3VtICsgbGluZS5wcmljZUNlbnRzICogbGluZS5xdHksIDApCn0K

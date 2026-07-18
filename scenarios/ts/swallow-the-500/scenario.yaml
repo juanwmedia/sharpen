@@ -1,0 +1,53 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/api.ts
+      content: |
+        function rawFetch(id: number): Promise<{ id: number }> {
+          if (id === 500) return Promise.reject(new Error('ORDER_500 upstream down'))
+          return Promise.resolve({ id })
+        }
+        
+        export async function fetchOrder(id: number): Promise<{ id: number } | null> {
+          try {
+            return await rawFetch(id)
+          } catch {
+            // Silent null. Product called it "resilience". It is not.
+            return null
+          }
+        }
+
+checks:
+  - name:
+      en: "exports fetchOrder"
+      es: "exporta fetchOrder"
+    expect:
+      exports:
+        entry: "src/api.ts"
+        export: "fetchOrder"
+
+  - name:
+      en: "fetchOrder(1) returns the order"
+      es: "fetchOrder(1) devuelve el pedido"
+    expect:
+      returns:
+        entry: "src/api.ts"
+        export: "fetchOrder"
+        args: [1]
+        equals: {"id":1}
+
+  - name:
+      en: "fetchOrder(500) rejects with ORDER_500"
+      es: "fetchOrder(500) rechaza con ORDER_500"
+    expect:
+      rejects:
+        entry: "src/api.ts"
+        export: "fetchOrder"
+        args: [500]
+        messageIncludes: "ORDER_500"
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/api.ts b64:ZnVuY3Rpb24gcmF3RmV0Y2goaWQ6IG51bWJlcik6IFByb21pc2U8eyBpZDogbnVtYmVyIH0+IHsKICBpZiAoaWQgPT09IDUwMCkgcmV0dXJuIFByb21pc2UucmVqZWN0KG5ldyBFcnJvcignT1JERVJfNTAwIHVwc3RyZWFtIGRvd24nKSkKICByZXR1cm4gUHJvbWlzZS5yZXNvbHZlKHsgaWQgfSkKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGZldGNoT3JkZXIoaWQ6IG51bWJlcik6IFByb21pc2U8eyBpZDogbnVtYmVyIH0+IHsKICByZXR1cm4gYXdhaXQgcmF3RmV0Y2goaWQpCn0K

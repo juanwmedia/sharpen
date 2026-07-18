@@ -191,22 +191,23 @@ export const scenarios: Scenario[] = [cleanSweep, newScenario]
 - Published `version` is immutable: bump it on any change.
 - If the scenario needs a git subcommand the porcelain lacks, extend
   `engine/porcelain/git-command.ts` and add cases in `test/porcelain.test.ts`.
-  If it needs a new setup op or predicate, extend `kinds/git.ts` (parser +
-  interpreter + rendered details) and cover it in
-  `test/scenario-package.test.ts`.
+  If it needs a new setup op or predicate, extend the kind file
+  (`kinds/git.ts` or `kinds/ts.ts`: parser + interpreter + rendered details)
+  and cover it in `test/scenario-package.test.ts` / `test/ts-runtime.test.ts`.
 - Gate: `npm test` (includes the dry-run), `npm run typecheck`,
   `npm run build`, no em/en dashes in touched files.
 
 ## Adding a scenario (checklist)
 
-1. Copy `scenarios/git/clean-sweep/` to `scenarios/<pack>/<name>/`.
+1. Copy a canonical folder for the kind (`scenarios/git/clean-sweep/` or
+   `scenarios/ts/tip-jar-lies/`) to `scenarios/<pack>/<name>/`.
 2. Edit `scenario.md`, `scenario.yaml`, `walkthrough.md` (keep `index.ts`).
 3. Import and append in `scenarios/index.ts`.
 4. Run the gate. `test/slug.test.ts` fails on title/slug collisions and
    `test/scenario-dryrun.test.ts` fails if the solution does not prove the
    scenario solvable.
 
-## Adding a future kind
+## Adding a new kind
 
 1. Extend `ScenarioKind` in `scenarios/package/types.ts`.
 2. Add `scenarios/package/kinds/<kind>.ts`: parser + interpreter for that
@@ -214,19 +215,41 @@ export const scenarios: Scenario[] = [cleanSweep, newScenario]
 3. Branch in `assemble.ts`.
 4. Drop the kind's logo in `public/kinds/<kind>.svg` and map it in
    `KIND_LOGOS` (`src/shared/config`) so scenario cards show it.
-5. Document the kind's vocabulary here. Do not bump `schema` unless the
-   **envelope** contract breaks (the vocabulary grows additively inside the
-   kind).
+5. Document the kind's vocabulary here (see kind=ts below). Do not bump
+   `schema` unless the **envelope** contract breaks (the vocabulary grows
+   additively inside the kind).
 
-## kind=ts (POC)
+## kind=ts
 
 Parallel to git, not Jasmine. Setup ops: `write`, `remove`. Check
 predicates: `exports` (`{ entry, export }`), `returns`
-(`{ entry, export, args?, equals }`), and `file` (`{ path, contentEquals }`).
-The engine harness loads the module after transpile (CommonJS). Pass/fail
-lives only in those checks: keep the export name as an `exports` row when
-renaming would brick the rest. Default Run (Monaco / `run` porcelain) is
-derived from the first `expect.returns` whose `entry` matches `spec.entry`.
-File replace without heredocs: `writefile <path> b64:<base64>`. Arena:
-`engine/ts-arena.ts` (no git porcelain). Spec requires `tree` + `entry` only
-(no `spec.probe`). Canonical example: `scenarios/ts/broken-tip/`.
+(`{ entry, export, args?, equals }`), `rejects`
+(`{ entry, export, args?, messageIncludes? }`), `stableAfterMutate`
+(`{ entry, export, mutateKey, mutateValue, rereadKey, equals, args? }`),
+`sameRef` (`{ entry, export, args? }`), `arrayPushStable`
+(`{ entry, export, pushValue, lengthEquals, args? }`), and `file`
+(`{ path, contentEquals }`). The harness transpiles (CommonJS) and
+`await`s thenables, so async/promises are first-class. `rejects` only
+passes on a call throw/rejection; load/transpile/missing-export failures
+are harness errors, not rejections. `equals` is deep (key order
+irrelevant). `stableAfterMutate` / `sameRef` / `arrayPushStable` load the
+module once (fresh loads would hide bleeds and break reference checks).
+`arrayPushStable` pushes onto the returned array, calls again, and passes
+only if length matches and the pushed value is absent. Pass/fail lives
+only in those checks. Default Run (Monaco / `run`) is derived from the
+first `returns` or `rejects` check on `spec.entry`. File replace:
+`writefile <path> b64:<base64>`. Arena: `engine/ts-arena.ts`. Spec:
+`tree` + `entry` only. Pack examples under `scenarios/ts/`. Generator:
+`scripts/gen-ts-pack.mjs` (does not touch `scenarios/index.ts`).
+
+Authoring for kind=ts:
+- Difficulty lives in the bug the export shows, not in side quests.
+- Copy must not claim structure the predicates cannot grade (no "must use
+  `.then`", "no nested callbacks", "must call the helpers" unless you can
+  enforce it).
+- Isolation / reference checks are engine-owned (`stableAfterMutate`,
+  `sameRef`, `arrayPushStable`): never put those probes in the player file.
+- Do not name the solving edit in the briefing; keep it in walkthrough.
+- Objectives are not bare assert dumps: one plain-language sentence of what
+  "done" means, then the concrete acceptance values (same voice as git
+  pack objectives).

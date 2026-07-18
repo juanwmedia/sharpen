@@ -1,0 +1,49 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+setup:
+  - write:
+      path: src/flags.ts
+      content: |
+        const FLAGS = { beta: false, verbose: false }
+        
+        export function getFlags(): { beta: boolean; verbose: boolean } {
+          // Returns the live object. Mutations stick. That is the incident.
+          return FLAGS
+        }
+
+checks:
+  - name:
+      en: "exports getFlags"
+      es: "exporta getFlags"
+    expect:
+      exports:
+        entry: "src/flags.ts"
+        export: "getFlags"
+
+  - name:
+      en: "getFlags returns the store shape"
+      es: "getFlags devuelve la forma del almacén"
+    expect:
+      returns:
+        entry: "src/flags.ts"
+        export: "getFlags"
+        args: []
+        equals: {"beta":false,"verbose":false}
+
+  - name:
+      en: "beta stays false after mutate"
+      es: "beta sigue false tras mutar"
+    expect:
+      stableAfterMutate:
+        entry: "src/flags.ts"
+        export: "getFlags"
+        args: []
+        mutateKey: "beta"
+        mutateValue: true
+        rereadKey: "beta"
+        equals: false
+
+# Machine proof of solvability: the dry-run validator replays these commands
+# and every check must go green. Never shown to the player.
+solution:
+  commands:
+    - writefile src/flags.ts b64:Y29uc3QgRkxBR1MgPSB7IGJldGE6IGZhbHNlLCB2ZXJib3NlOiBmYWxzZSB9CgpleHBvcnQgZnVuY3Rpb24gZ2V0RmxhZ3MoKTogeyBiZXRhOiBib29sZWFuOyB2ZXJib3NlOiBib29sZWFuIH0gewogIHJldHVybiB7IC4uLkZMQUdTIH0KfQo=

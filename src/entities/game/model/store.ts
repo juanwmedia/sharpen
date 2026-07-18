@@ -89,6 +89,9 @@ const state = reactive<GameState>({
 let arena: Arena | null = null
 let events: EventSource | null = null
 let termWrite: (data: string) => void = () => {}
+/** Optional sink for kind=ts (Monaco console); terminal writer stays the git path. */
+type StatusKind = 'ok' | 'error' | 'log'
+let statusSink: ((kind: StatusKind, text: string) => void) | null = null
 // Navigation is the router's job (app layer): when the server forgets a run,
 // the arena page registers what "go home" means.
 let runLostHandler: () => void = () => {}
@@ -161,6 +164,16 @@ function flushTerminalReplay(): void {
 export function registerTerminalWriter(writer: (data: string) => void): void {
   termWrite = writer
   flushTerminalReplay()
+}
+
+/** TsWorkspacePane registers this so solve / not-yet / reveal lines are visible. */
+export function registerStatusSink(fn: ((kind: StatusKind, text: string) => void) | null): void {
+  statusSink = fn
+}
+
+function feedback(termAnsi: string, status?: { kind: StatusKind; text: string }): void {
+  termWrite(termAnsi)
+  if (status) statusSink?.(status.kind, status.text)
 }
 
 export function registerRunLostHandler(handler: () => void): void {
@@ -371,7 +384,8 @@ async function revealSolution(): Promise<void> {
   const res = await fetch(apiRoutes.runReveal(state.runId), { method: 'POST' })
   if (!res.ok) return
   state.status = RUN_STATUS.revealed
-  termWrite(ansi.yellow(t('terminal.revealed')) + CRLF)
+  const text = t('terminal.revealed')
+  feedback(ansi.yellow(text) + CRLF, { kind: 'log', text })
   scheduleLearnSave()
 }
 
@@ -524,11 +538,17 @@ export async function onCommand(
 
 export async function submit({ quiet = false }: { quiet?: boolean } = {}): Promise<void> {
   if (state.status === RUN_STATUS.revealed) {
-    if (!quiet) termWrite(ansi.yellow(t('terminal.timeUp')) + CRLF)
+    if (!quiet) {
+      const text = t('terminal.timeUp')
+      feedback(ansi.yellow(text) + CRLF, { kind: 'log', text })
+    }
     return
   }
   if (state.status === RUN_STATUS.passed) {
-    if (!quiet) termWrite(ansi.dim(t('terminal.alreadySolved')) + CRLF)
+    if (!quiet) {
+      const text = t('terminal.alreadySolved')
+      feedback(ansi.dim(text) + CRLF, { kind: 'log', text })
+    }
     return
   }
   if (state.status !== RUN_STATUS.live || !state.runId) return
@@ -557,14 +577,17 @@ export async function submit({ quiet = false }: { quiet?: boolean } = {}): Promi
     if (state.scenario && !state.completed.includes(state.scenario.id)) {
       state.completed.push(state.scenario.id)
     }
-    termWrite(ansi.green(t('terminal.solved')) + CRLF)
+    const text = t('terminal.solved')
+    feedback(ansi.green(text) + CRLF, { kind: 'ok', text })
     scheduleLearnSave()
   } else {
     const green = verdict.checks.filter((c) => c.pass).length
-    termWrite(
-      quiet
-        ? ansi.dim(t('terminal.notYetQuiet', { green, total: verdict.checks.length })) + CRLF
-        : ansi.red(t('terminal.notYetLoud')) + CRLF
+    const text = quiet
+      ? t('terminal.notYetQuiet', { green, total: verdict.checks.length })
+      : t('terminal.notYetLoud')
+    feedback(
+      quiet ? ansi.dim(text) + CRLF : ansi.red(text) + CRLF,
+      { kind: 'error', text }
     )
     announceLost(verdict.lost)
   }
@@ -663,7 +686,8 @@ function connectEvents(runId: string): void {
     if (state.mode === 'learn') return
     state.status = RUN_STATUS.revealed
     const seconds = Math.round((state.scenario?.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS) / 1000)
-    termWrite(ansi.yellow(t('terminal.timeout', { seconds })) + CRLF)
+    const text = t('terminal.timeout', { seconds })
+    feedback(ansi.yellow(text) + CRLF, { kind: 'log', text })
     void fetch(apiRoutes.runExpire(runId), { method: 'POST' }).catch(() => {})
   })
   events.addEventListener(ARENA_EVENT.mentorThinking, () => {
