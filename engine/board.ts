@@ -20,6 +20,14 @@ function boardLine(label: string, entries: string[]): string {
 
 /** Compact working-tree summary for mentor prompts (English, paths only). */
 export function formatBoard(snapshot: Snapshot): string {
+  if (snapshot.files) {
+    const paths = Object.keys(snapshot.files).sort()
+    return [
+      boardLine('workspace', ['ts']),
+      boardLine('files', paths.length ? paths : [BOARD_NONE]),
+    ].join('\n')
+  }
+
   const branch = snapshot.head.branch ?? BOARD_DETACHED
   const untracked = untrackedFiles(snapshot)
   const modified: string[] = []

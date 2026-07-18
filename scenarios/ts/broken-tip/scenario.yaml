@@ -1,0 +1,44 @@
+# Mechanics document (schema 2): setup as steps, checks as predicates.
+# No Jasmine: the engine calls the export with fixed args.
+setup:
+  - write:
+      path: src/price.ts
+      content: |
+        export function formatPrice(cents: number): string {
+          // Bug: forgets to divide by 100.
+          return `$${cents.toFixed(2)}`
+        }
+
+checks:
+  - name:
+      en: exports formatPrice
+      es: exporta formatPrice
+    expect:
+      exports:
+        entry: src/price.ts
+        export: formatPrice
+
+  - name:
+      en: formatPrice(100) returns $1.00
+      es: formatPrice(100) devuelve $1.00
+    expect:
+      returns:
+        entry: src/price.ts
+        export: formatPrice
+        args: [100]
+        equals: "$1.00"
+
+  - name:
+      en: formatPrice(0) returns $0.00
+      es: formatPrice(0) devuelve $0.00
+    expect:
+      returns:
+        entry: src/price.ts
+        export: formatPrice
+        args: [0]
+        equals: "$0.00"
+
+solution:
+  commands:
+    # b64 payload: shell-safe; decode is engine-side (writefile).
+    - writefile src/price.ts b64:ZXhwb3J0IGZ1bmN0aW9uIGZvcm1hdFByaWNlKGNlbnRzOiBudW1iZXIpOiBzdHJpbmcgewogIHJldHVybiAnJCcgKyAoY2VudHMgLyAxMDApLnRvRml4ZWQoMikKfQo=

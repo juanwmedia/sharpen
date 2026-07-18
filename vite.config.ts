@@ -21,8 +21,11 @@ export default defineConfig({
     sourcemap: true,
   },
   server: {
+    // POC worktree: keep main sharpen on 4517/5173; this stack uses 4518/5174.
+    port: 5174,
+    strictPort: true,
     proxy: {
-      '/api': 'http://127.0.0.1:4517',
+      '/api': 'http://127.0.0.1:4518',
     },
   },
 })

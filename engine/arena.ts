@@ -6,6 +6,7 @@ import { createGitCommand } from './porcelain/git-command.ts'
 import { appendReflog } from './porcelain/reflog.ts'
 import { dirname, join } from './paths.ts'
 import { takeSnapshot, stateHash } from './snapshot.ts'
+import { createTsArena } from './ts-arena.ts'
 import { ARENA_DEFAULT_BRANCH } from './types.ts'
 import type { Arena, Scenario, ScenarioSetupEnv } from './types.ts'
 
@@ -15,11 +16,15 @@ const SETUP_AUTHOR = { name: 'Riley Ortega', email: 'riley@sharpen.local' }
 // which is what makes evidence replayable byte for byte.
 const BASE_TIMESTAMP = 1767225600
 
-// One arena = one scenario attempt: a fresh virtual filesystem shared by the
-// shell and git, a repo built by the scenario's deterministic setup, and a
-// bash whose `git` is our porcelain. Runs identically in browser and Node;
-// that symmetry is what makes CI replay validation possible later.
+// One arena = one scenario attempt. kind=git: virtual FS + porcelain.
+// kind=ts: virtual FS + `run` (see ts-arena.ts). Same createArena entry
+// for browser, server replay, and dry-run.
 export async function createArena(scenario: Scenario): Promise<Arena> {
+  if (scenario.kind === 'ts') return createTsArena(scenario)
+  return createGitArena(scenario)
+}
+
+async function createGitArena(scenario: Scenario): Promise<Arena> {
   const jbFs = new InMemoryFs()
   const gitFs = createGitFs(jbFs)
   // GitFs erases the named PromiseFsClient keys behind a Record (see

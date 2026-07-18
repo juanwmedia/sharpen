@@ -63,6 +63,8 @@ export interface Snapshot {
   branches: Record<string, string>
   status: StatusRow[]
   log: Array<{ oid: string; message: string }>
+  /** kind=ts: workspace file contents (relative paths). Absent for git. */
+  files?: Record<string, string>
 }
 
 export interface ScenarioSetupEnv {
@@ -115,6 +117,8 @@ export interface Scenario {
   /** Canonical solving commands: machine proof of solvability (the dry-run
    * validator replays them). Never shown to the player. */
   solution: string[]
+  /** kind=ts: default Run target, derived from the first returns check on entry. */
+  tsProbe?: { entry: string; exportName: string; args: unknown[] }
   setup(env: ScenarioSetupEnv): Promise<void>
   assert(ctx: ScenarioAssertContext): Promise<{ pass: boolean; checks: Check[] }>
   /** Optional dead-end detector: names of failing checks whose required

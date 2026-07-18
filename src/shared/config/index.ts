@@ -11,7 +11,7 @@ export const TERMINAL_ROWS = 20
 
 /** Commands offered by tab completion (first word only). */
 export const SHELL_COMMANDS = [
-  'git', 'ls', 'cat', 'rm', 'grep', 'find', 'echo', 'cd', 'pwd', 'head', 'tail', 'wc', 'clear',
+  'git', 'run', 'writefile', 'ls', 'cat', 'rm', 'grep', 'find', 'echo', 'cd', 'pwd', 'head', 'tail', 'wc', 'clear',
 ] as const
 
 /** The conversation box caps near the terminal frame height and scrolls
@@ -25,10 +25,17 @@ export const QUESTION_MAX_LENGTH = 500
 export const SWAP_SHORTCUT_CODES: readonly string[] = ['Backquote', 'IntlBackslash']
 export const SWAP_SHORTCUT_LABEL = 'Ctrl+`'
 
+/** kind=ts Run while Monaco has focus. Monaco KeyMod.CtrlCmd = Cmd on macOS. */
+export const TS_RUN_SHORTCUT_LABEL =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+    ? '⌘+Enter'
+    : 'Ctrl+Enter'
+
 /** Logo shown on scenario cards per artifact kind (assets in public/kinds/).
  * A kind without an entry simply shows no logo. */
 export const KIND_LOGOS: Readonly<Record<string, string>> = {
   git: '/kinds/git.svg',
+  ts: '/kinds/ts.svg',
 }
 
 /** Command output sent to the server transcript is capped at this size. */

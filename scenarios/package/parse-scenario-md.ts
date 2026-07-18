@@ -4,7 +4,7 @@ import type { ParsedScenarioMd, ScenarioKind, ScenarioManifest } from './types.t
 
 const SECTION_RE = /^##\s+([A-Za-z][A-Za-z0-9 ]*?)\s*\((\w+)\)\s*$/gm
 
-const KNOWN_KINDS = new Set<ScenarioKind>(['git'])
+const KNOWN_KINDS = new Set<ScenarioKind>(['git', 'ts'])
 
 function emptyLocalized(): Record<Locale, string> {
   return { en: '', es: '' }

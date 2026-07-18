@@ -42,6 +42,19 @@ export default {
     start: 'Empezar desafío',
     back: 'Volver a los escenarios',
   },
+  tsPane: {
+    title: 'Workspace TypeScript',
+    // {'@'} escapes the bare @, which intlify parses as a linked message.
+    windowTitle: "you{'@'}sharpen · {file}",
+    hint: 'edita y Run valida',
+    run: 'Run',
+    running: 'Ejecutando…',
+    runShortcut: 'Run (igual que el botón)',
+    console: 'Consola',
+    consoleIdle: 'Sin salida aún. Pulsa Run.',
+    consoleClear: 'Limpiar',
+    consoleEmptyRun: '(sin salida)',
+  },
   terminal: {
     // {'@'} escapes the bare @, which intlify parses as a linked message.
     title: "you{'@'}sharpen · /repo",

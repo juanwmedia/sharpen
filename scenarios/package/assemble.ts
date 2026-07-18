@@ -1,5 +1,6 @@
 import type { Scenario } from '../../engine/types.ts'
 import { assembleGitScenario } from './kinds/git.ts'
+import { assembleTsScenario } from './kinds/ts.ts'
 import { parseScenarioMd } from './parse-scenario-md.ts'
 
 export interface AssembleScenarioInput {
@@ -18,6 +19,8 @@ export function assembleScenario(input: AssembleScenarioInput): Scenario {
   switch (parsed.manifest.kind) {
     case 'git':
       return assembleGitScenario(parsed, input.walkthroughSrc, input.mechanicsSrc)
+    case 'ts':
+      return assembleTsScenario(parsed, input.walkthroughSrc, input.mechanicsSrc)
     default: {
       const kind: never = parsed.manifest.kind
       throw new Error(`assembleScenario: unhandled kind ${String(kind)}`)

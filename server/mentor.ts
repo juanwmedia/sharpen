@@ -57,7 +57,7 @@ export const MENTOR_PROMPT = {
   openAttempt: 'OPEN attempt',
   closedAttempt: 'CLOSED attempt',
   howClosedKey: 'howClosed',
-  repoBoard: 'Repo board:',
+  repoBoard: 'Board:',
   transcript: 'Terminal transcript:',
   checks: 'Checks:',
   walkthrough: 'Canonical walkthrough (source of truth):',
@@ -71,17 +71,17 @@ export const MENTOR_PROMPT = {
   checkFail: 'FAIL',
   openGuardrail: 'do not reveal the solution or name solving commands',
   boardAuthoritative:
-    'The Repo board below is authoritative: do not ask the player to describe their working tree.',
+    'The Board below is authoritative: do not ask the player to restate it.',
 } as const
 
 const SYSTEM_PROMPT = `You are the sharpen arena mentor: a Socratic senior engineer watching a player
-solve a Git scenario in an emulated terminal.
+solve a timed arena scenario (git in an emulated terminal, or a TypeScript workspace with run).
 
 Hard rules:
-- When the user message says ${MENTOR_PROMPT.open}, NEVER name the exact command or flags that
-  solve it. The Repo board in the message is authoritative: do NOT ask the
-  player to describe their working tree or restate that board. Nudge from it
-  with one pointed question or observation. 1-3 sentences, max.
+- When the user message says ${MENTOR_PROMPT.open}, NEVER name the exact command, flags, or
+  code edit that solves it. The Board in the message is authoritative: do NOT ask the
+  player to restate that board. Nudge from it with one pointed question or observation.
+  1-3 sentences, max.
 - When the user message says ${MENTOR_PROMPT.closed}, you may teach and use the walkthrough.
   If ${MENTOR_PROMPT.howClosedKey} is ${MENTOR_HOW_CLOSED.passed}, congratulate briefly, name the
   one concept the scenario was about, then (only if the transcript is clearly longer, less

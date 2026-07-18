@@ -10,6 +10,7 @@ import { LearnPanel } from '@/widgets/learn-panel/index.ts'
 import { MentorChat } from '@/widgets/mentor-chat/index.ts'
 import { ScenarioBriefing } from '@/widgets/scenario-briefing/index.ts'
 import { TerminalPane } from '@/widgets/terminal-pane/index.ts'
+import { TsWorkspacePane } from '@/widgets/ts-workspace-pane/index.ts'
 import { TimerRing } from '@/widgets/run-timer/index.ts'
 import { VerdictPanel } from '@/widgets/verdict-panel/index.ts'
 import { DEFAULT_TIME_LIMIT_MS, ROUTE_NAMES, SWAP_SHORTCUT_CODES } from '@/shared/config/index.ts'
@@ -24,17 +25,20 @@ const { state, prepareScenario, startRun, beginChallenge, leaveRun, askMentor, r
 const inBriefing = computed(() => state.status === RUN_STATUS.briefing)
 
 const terminalPane = ref<InstanceType<typeof TerminalPane> | null>(null)
+const tsPane = ref<InstanceType<typeof TsWorkspacePane> | null>(null)
 const chatPane = ref<InstanceType<typeof MentorChat> | null>(null)
+const isTsKind = computed(() => state.scenario?.kind === 'ts')
 
-// Ctrl + the physical key above Tab cycles focus terminal <-> chat, hands
-// never leaving the keyboard. Capture phase: it must win over wterm's own
-// key handling when the terminal has focus.
+// Ctrl + the physical key above Tab cycles focus workspace <-> chat, hands
+// never leaving the keyboard. Capture phase: wins over wterm / Monaco.
 function onSwapShortcut(e: KeyboardEvent): void {
   if (!e.ctrlKey || e.metaKey || e.altKey || !SWAP_SHORTCUT_CODES.includes(e.code)) return
   if (inBriefing.value) return
+  const workspace = isTsKind.value ? tsPane.value : terminalPane.value
+  if (!workspace) return
   e.preventDefault()
-  if (terminalPane.value?.hasFocus()) chatPane.value?.focus()
-  else terminalPane.value?.focus()
+  if (workspace.hasFocus()) chatPane.value?.focus()
+  else workspace.focus()
 }
 
 // The URL owns the scenario: /:pack/:slug (e.g. /git/clean-sweep). Learn
@@ -104,8 +108,15 @@ const terminalPinned = ref(true)
       </div>
       <template v-if="!inBriefing">
         <div :class="{ 'sticky top-3 z-10': terminalPinned }">
+          <TsWorkspacePane
+            v-if="state.scenario && isTsKind"
+            ref="tsPane"
+            :key="state.scenario.id"
+            :pinned="terminalPinned"
+            @toggle-pin="terminalPinned = !terminalPinned"
+          />
           <TerminalPane
-            v-if="state.scenario"
+            v-else-if="state.scenario"
             ref="terminalPane"
             :key="state.runId ?? ''"
             :pinned="terminalPinned"

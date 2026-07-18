@@ -43,6 +43,19 @@ export default {
     start: 'Start challenge',
     back: 'Back to scenarios',
   },
+  tsPane: {
+    title: 'TypeScript workspace',
+    // {'@'} is intlify's escape: a bare @ starts a linked message.
+    windowTitle: "you{'@'}sharpen · {file}",
+    hint: 'edit, then Run validates',
+    run: 'Run',
+    running: 'Running…',
+    runShortcut: 'Run (same as the button)',
+    console: 'Console',
+    consoleIdle: 'No output yet. Press Run.',
+    consoleClear: 'Clear',
+    consoleEmptyRun: '(no output)',
+  },
   terminal: {
     // {'@'} is intlify's escape: a bare @ starts a linked message and breaks
     // the message compiler at render time.

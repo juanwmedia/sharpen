@@ -217,3 +217,16 @@ export const scenarios: Scenario[] = [cleanSweep, newScenario]
 5. Document the kind's vocabulary here. Do not bump `schema` unless the
    **envelope** contract breaks (the vocabulary grows additively inside the
    kind).
+
+## kind=ts (POC)
+
+Parallel to git, not Jasmine. Setup ops: `write`, `remove`. Check
+predicates: `exports` (`{ entry, export }`), `returns`
+(`{ entry, export, args?, equals }`), and `file` (`{ path, contentEquals }`).
+The engine harness loads the module after transpile (CommonJS). Pass/fail
+lives only in those checks: keep the export name as an `exports` row when
+renaming would brick the rest. Default Run (Monaco / `run` porcelain) is
+derived from the first `expect.returns` whose `entry` matches `spec.entry`.
+File replace without heredocs: `writefile <path> b64:<base64>`. Arena:
+`engine/ts-arena.ts` (no git porcelain). Spec requires `tree` + `entry` only
+(no `spec.probe`). Canonical example: `scenarios/ts/broken-tip/`.

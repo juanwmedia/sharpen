@@ -289,9 +289,10 @@ async function startRun(scenarioId: string): Promise<void> {
   })
 
   state.scenario = markRaw(scenario)
-  state.runId = runId
-
+  // Create the arena BEFORE publishing runId: kind=ts Monaco mounts on runId
+  // and would otherwise seed with "// loading…" while arena is still null.
   arena = await createArena(scenario)
+  state.runId = runId
   connectEvents(runId)
 
   if (snapshot && state.mode === 'learn') {
@@ -403,6 +404,14 @@ export function registerPromptRefresher(fn: (() => void) | null): void {
  * creation too: scenarios may start on a branch other than main. */
 async function syncBranch(): Promise<void> {
   if (!arena) return
+  // kind=ts has no git branch tip; prompt shows a workspace label instead.
+  if (arena.scenario.kind === 'ts') {
+    if (state.branch !== 'workspace') {
+      state.branch = 'workspace'
+      promptRefresh()
+    }
+    return
+  }
   const branch =
     (await arena.git
       // GitFs deliberately hides isomorphic-git's named keys (see types.ts).
@@ -419,6 +428,44 @@ export async function execCommand(command: string): Promise<ExecResult> {
   const result = await arena.exec(command)
   await syncBranch()
   return result
+}
+
+function utf8ToB64(text: string): string {
+  return btoa(unescape(encodeURIComponent(text)))
+}
+
+/** Read a workspace file from the live arena (kind=ts Monaco seed / resync). */
+export async function readArenaFile(path: string): Promise<string | null> {
+  if (!arena) return null
+  try {
+    return await arena.jbFs.readFile(`${arena.dir}/${path}`, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/**
+ * kind=ts Run: persist Monaco source via writefile, probe with run, validate.
+ * Both lines enter the authoritative transcript (same path as terminal Enter).
+ */
+export async function runTsWorkspace(code: string): Promise<{ consoleText: string; pass: boolean }> {
+  if (!arena) throw new Error('arena not ready')
+  const probe = arena.scenario.tsProbe
+  if (!probe) throw new Error('tsProbe missing on scenario')
+
+  const writeCmd = `writefile ${probe.entry} b64:${utf8ToB64(code)}`
+  const writeResult = await execCommand(writeCmd)
+  // Plumbing stays in the transcript for replay; never paint writefile/b64 in chat.
+  await onCommand(writeCmd, writeResult, { chatLabel: null })
+
+  const argStr = probe.args.map((a) => JSON.stringify(a)).join(' ')
+  const runCmd = `run ${probe.entry} ${probe.exportName}${argStr ? ` ${argStr}` : ''}`
+  const runResult = await execCommand(runCmd)
+  const label = `${t('tsPane.run')} ${probe.exportName}(${probe.args.map(String).join(', ')})`
+  await onCommand(runCmd, runResult, { chatLabel: label })
+
+  const consoleText = (runResult.stdout + runResult.stderr).trim()
+  return { consoleText, pass: state.status === RUN_STATUS.passed }
 }
 
 let pendingCommandBubble: MentorItem | null = null
@@ -440,14 +487,28 @@ function flushCommandBubble(): void {
 
 // Runs AFTER the shell flushed the command output. Core mechanic: EVERY Enter
 // validates, so the arena judges the state each command leaves behind.
-export async function onCommand(command: string, result: ExecResult): Promise<void> {
+// chatLabel: undefined = show the raw command; string = friendly bubble;
+// null = keep transcript/submit but never paint a youCmd bubble (kind=ts writefile).
+export async function onCommand(
+  command: string,
+  result: ExecResult,
+  opts?: { chatLabel?: string | null }
+): Promise<void> {
   if (state.status !== RUN_STATUS.live) return
   // The command bubble waits for the server's nudge decision: an Enter that
   // wakes nobody (ls, git status, empty) does not belong in the conversation.
   // Flushed by whoever learns the decision first: the submit response or the
   // mentor-thinking SSE frame (they race).
   const firstErrLine = result.exitCode !== 0 ? (result.stderr.split('\n')[0] ?? '') : ''
-  pendingCommandBubble = { role: MENTOR_ROLE.youCmd, text: command, ...(firstErrLine ? { meta: firstErrLine } : {}) }
+  if (opts?.chatLabel === null) {
+    pendingCommandBubble = null
+  } else {
+    pendingCommandBubble = {
+      role: MENTOR_ROLE.youCmd,
+      text: opts?.chatLabel ?? command,
+      ...(firstErrLine ? { meta: firstErrLine } : {}),
+    }
+  }
   const output = (result.stdout + result.stderr).slice(0, COMMAND_OUTPUT_MAX_CHARS)
   if (state.mode === 'learn') {
     learnTranscript.push({ command, output })
@@ -671,5 +732,7 @@ export function useGame() {
     setRunMode,
     revealSolution,
     wipeLearn,
+    readArenaFile,
+    runTsWorkspace,
   }
 }

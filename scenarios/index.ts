@@ -13,12 +13,14 @@ import theVanishedFile from './git/the-vanished-file/index.ts'
 import timeMachineRecovery from './git/time-machine-recovery/index.ts'
 import tipBelongsOnFeature from './git/tip-belongs-on-feature/index.ts'
 import wrongBranchWetPaint from './git/wrong-branch-wet-paint/index.ts'
+import brokenTip from './ts/broken-tip/index.ts'
 import { slugify } from './slug.ts'
 import type { Scenario, ScenarioSummary } from '../engine/types.ts'
 
 // Display order is curated easy to hard (concept progression, not alphabet).
 // Same-family scenarios stay spaced: restore path vs deleted; first branch
-// vs wet-paint; unstage inspect vs secret stakes.
+// vs wet-paint; unstage inspect vs secret stakes. POC kind=ts follows the
+// git pack for now.
 export const scenarios: Scenario[] = [
   saveYourWork,
   takeItBack,
@@ -35,6 +37,7 @@ export const scenarios: Scenario[] = [
   tipBelongsOnFeature,
   timeMachineRecovery,
   halfDeleted,
+  brokenTip,
 ]
 
 export function getScenario(id: string): Scenario | undefined {

@@ -1,7 +1,13 @@
 import type { Locale, Localized } from '../../engine/types.ts'
 
 /** Discriminator for which assembler understands setup/assert/spec. */
-export type ScenarioKind = 'git'
+export type ScenarioKind = 'git' | 'ts'
+
+export interface TsScenarioSpec {
+  tree: string
+  /** Main entry file players edit / run. */
+  entry: string
+}
 
 export interface ScenarioManifest {
   schema: 2
