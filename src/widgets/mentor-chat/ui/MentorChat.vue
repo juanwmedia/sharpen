@@ -24,7 +24,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ ask: [question: string] }>()
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const { state } = useGame()
 const question = ref('')
 const feedEl = ref<HTMLElement | null>(null)
@@ -77,7 +77,7 @@ function send(): void {
 
 <template>
   <div
-    class="panel transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-line))]"
+    class="panel min-w-0 transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-line))]"
   >
     <Eyebrow>
       {{ t('chat.eyebrow') }}

@@ -1,6 +1,6 @@
 {
   "name": "sharpen",
-  "description": "Sharpen by FrontendLeap. Timed Git challenges in your browser with a Socratic AI mentor. Launches a local arena: 60 seconds, a real Git terminal, instant verdicts, and a leaderboard.",
+  "description": "Sharpen by FrontendLeap. Timed challenges in your browser (Git and TypeScript) with a Socratic AI mentor. Launches a local arena: 60 seconds, instant verdicts, and a mentor that reacts to what you actually did.",
   "version": "0.1.6",
   "author": {
     "name": "Juan Andrés Núñez"

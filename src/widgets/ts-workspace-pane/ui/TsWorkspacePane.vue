@@ -8,7 +8,7 @@ import { createMonacoEditor, loadMonaco, type MonacoHandle } from '@/shared/lib/
 defineProps<{ pinned: boolean }>()
 defineEmits<{ 'toggle-pin': [] }>()
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const { state, readArenaFile, runTsWorkspace } = useGame()
 
 type ConsoleLine = { id: string; kind: 'log' | 'error' | 'result'; text: string; at: Date }
@@ -139,9 +139,9 @@ async function onRun(): Promise<void> {
 <template>
   <div
     ref="root"
-    class="overflow-hidden rounded-panel border border-line-strong bg-bg-deep shadow-[0_24px_60px_rgb(4_8_16_/_0.55)] transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line-strong))]"
+    class="min-w-0 overflow-hidden rounded-panel border border-line-strong bg-bg-deep shadow-[0_24px_60px_rgb(4_8_16_/_0.55)] transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line-strong))]"
   >
-    <div class="flex items-center gap-2 border-b border-line px-3.5 py-2.5">
+    <div class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line px-3 py-2.5 sm:flex-nowrap sm:px-3.5">
       <span class="h-[11px] w-[11px] rounded-full bg-[#ff5f57]"></span>
       <span class="h-[11px] w-[11px] rounded-full bg-[#febc2e]"></span>
       <span class="h-[11px] w-[11px] rounded-full bg-[#28c840]"></span>

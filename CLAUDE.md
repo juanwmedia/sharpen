@@ -1,9 +1,9 @@
 # sharpen: agent guide
 
-Timed Git challenges in the browser with a Socratic mentor. Core mechanic:
-EVERY Enter validates. The player's command runs locally, the server replays
-the whole transcript with the same engine and returns the authoritative
-verdict, and the mentor reacts to what actually happened.
+Timed challenges in the browser (Git and TypeScript) with a Socratic mentor.
+Core mechanic: EVERY Enter validates. The player's command runs locally, the
+server replays the whole transcript with the same engine and returns the
+authoritative verdict, and the mentor reacts to what actually happened.
 
 Read `docs/api-notes.md` BEFORE touching engine code: it records verified API
 facts (just-bash, isomorphic-git, wterm, claude CLI, vue-i18n) that override
@@ -12,12 +12,13 @@ anything you remember about those libraries.
 ## Map
 
 ```
-engine/       Deterministic git arena. Framework-agnostic: runs in the
-              browser, in server replay, and (v2) in a CI Action.
+engine/       Deterministic arena (git + ts kinds). Framework-agnostic: runs
+              in the browser, in server replay, and (v2) in a CI Action.
   types.ts    THE shared contract: Scenario, Check, Evidence, Locale,
               Localized, ARENA_EVENT, MENTOR_ERROR_KIND, ARENA_DEFAULT_BRANCH.
   arena.ts    createArena(scenario): InMemoryFs + git init + setup + bash
               with our porcelain. Fixed clock (BASE_TIMESTAMP + tick).
+  ts-arena.ts TypeScript workspace arena (Monaco + run harness).
   porcelain/  Hand-written `git` subcommands over isomorphic-git.
   fs-bridge.ts just-bash IFileSystem -> isomorphic-git PromiseFsClient.
 server/       Express + SSE. Authoritative timer, transcript replay,
@@ -150,9 +151,11 @@ skills/       The Claude Code plugin skill that boots the arena.
   `FRONTENDLEAP_URL` from `src/shared/config`. Playing never requires a
   FrontendLeap account: the platform is brand and (v2) optional global
   ranking, never a gate.
-- Terminal geometry is fixed (`TERMINAL_COLS`/`TERMINAL_ROWS`, autoResize
-  false): 20 rows exactly fill the frame so a fresh terminal shows no
-  scrollbar. ANSI codes come from `@/shared/lib/ansi.ts`.
+- Terminal rows stay fixed (`TERMINAL_ROWS` via `#terminal` CSS height) so a
+  fresh terminal shows no scrollbar; cols follow the pane width (`autoResize`
+  true) so phones are not blown past the viewport. `TERMINAL_COLS` is only the
+  initial hint before the first measure. ANSI codes come from
+  `@/shared/lib/ansi.ts`.
 
 ## Adding a scenario
 

@@ -5,7 +5,7 @@ import { lt } from '@/shared/i18n/index.ts'
 import { Eyebrow } from '@/shared/ui/index.ts'
 
 defineProps<{ checks: readonly Check[] | null }>()
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>

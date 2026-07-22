@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { RUN_MODES, type RunMode } from '@engine/types.ts'
 import { RUN_STATUS, useGame } from '@/entities/game/index.ts'
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const { state, setRunMode } = useGame()
 
 const locked = computed(() => state.status !== RUN_STATUS.idle)

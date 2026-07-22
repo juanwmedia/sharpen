@@ -5,7 +5,7 @@
 <h1 align="center">sharpen</h1>
 
 <p align="center">
-  Timed Git challenges in your browser, with a Socratic AI mentor.<br />
+  Timed challenges in your browser (Git and TypeScript), with a Socratic AI mentor.<br />
   A Claude Code plugin by <a href="https://frontendleap.com">FrontendLeap</a>.
 </p>
 
@@ -179,10 +179,11 @@ live in `docs/api-notes.md`: read them before touching engine code.
 
 ## Roadmap
 
-- **v1 (now):** local arena, git pack with the first scenario, local ranking.
+- **v1 (now):** local arena, git pack plus TypeScript pack (Monaco + Run),
+  local ranking.
 - **v2:** shared ranking. Submissions via GitHub Issues (identity signed by
   GitHub), CI Action replays every transcript with the same engine and
   regenerates the leaderboard; only verified entries count.
 - **v3:** nonce-seeded scenarios plus GitHub server timestamps, making claimed
-  times attack-resistant. More packs: TypeScript (Monaco editor), Unix 101. A
-  challenge declares its artifact; the arena does not change.
+  times attack-resistant. More packs (Unix 101, …). A challenge declares its
+  artifact; the arena does not change.

@@ -7,7 +7,7 @@ import { TIMER_DANGER_MS } from '@/shared/config/index.ts'
 
 const props = defineProps<{ status: RunStatus; deadline: number; totalMs: number; notYet?: boolean }>()
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 
 const RING_SIZE = 120
 const RING_RADIUS = 52

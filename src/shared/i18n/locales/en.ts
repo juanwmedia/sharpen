@@ -21,11 +21,18 @@ export default {
     title: 'Pick your scenario',
     done: 'Done',
     ledeLearn:
-      'No clock, a Socratic mentor watching. Git arenas judge the repo; TypeScript arenas judge what your exports return. Reveal when you want the walkthrough.',
+      'No clock, a Socratic mentor watching. Git checks the repo; TypeScript checks what your exports return. Reveal when you want the walkthrough.',
     ledeChallenge:
-      '60 seconds on the clock, a Socratic mentor watching. Git arenas judge the repo; TypeScript arenas judge what your exports return. Any correct solution passes.',
+      '60 seconds on the clock, a Socratic mentor watching. Git checks the repo; TypeScript checks what your exports return. Any correct solution passes.',
+    filterLabel: 'Filter by kind',
+    filter: {
+      all: 'all',
+      git: 'git',
+      ts: 'TypeScript',
+    },
+    count: '{n} scenarios',
     meta: '{pack} · {difficulty} · {seconds}s',
-    enterArena: '→ enter the arena',
+    enterArena: '→ enter',
   },
   difficulty: {
     easy: 'easy',
@@ -80,7 +87,7 @@ export default {
   chat: {
     eyebrow: 'conversation',
     idleGit:
-      "Your commands and the mentor's replies land here as a conversation. While you practice the mentor only nudges, never spoils; after a reveal or a solve, it teaches. Commands live in the terminal, where `git <command> --help` tells you what this arena supports; this box is for the why.",
+      "Your commands and the mentor's replies land here as a conversation. While you practice the mentor only nudges, never spoils; after a reveal or a solve, it teaches. Commands live in the terminal, where `git help` and `git COMMAND --help` tell you what this arena supports; this box is for the why.",
     idleTs:
       "Your attempts and the mentor's replies land here as a conversation. While you practice the mentor only nudges, never spoils; after a reveal or a solve, it teaches. Edits live in the workspace editor; Run asks the arena to judge export return values. This box is for the why.",
     placeholderLive: 'Ask for a nudge…',

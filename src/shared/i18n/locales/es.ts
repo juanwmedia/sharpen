@@ -20,11 +20,18 @@ export default {
     title: 'Elige tu escenario',
     done: 'Hecho',
     ledeLearn:
-      'Sin reloj, un mentor socrático observando. Las arenas git juzgan el repo; las de TypeScript juzgan lo que devuelven tus exports. Desvela la solución cuando quieras el walkthrough.',
+      'Sin reloj, un mentor socrático observando. Git comprueba el repo; TypeScript comprueba lo que devuelven tus exports. Desvela la solución cuando quieras el walkthrough.',
     ledeChallenge:
-      '60 segundos en el reloj, un mentor socrático observando. Las arenas git juzgan el repo; las de TypeScript juzgan lo que devuelven tus exports. Cualquier solución correcta pasa.',
+      '60 segundos en el reloj, un mentor socrático observando. Git comprueba el repo; TypeScript comprueba lo que devuelven tus exports. Cualquier solución correcta pasa.',
+    filterLabel: 'Filtrar por tipo',
+    filter: {
+      all: 'todos',
+      git: 'git',
+      ts: 'TypeScript',
+    },
+    count: '{n} escenarios',
     meta: '{pack} · {difficulty} · {seconds}s',
-    enterArena: '→ entra en la arena',
+    enterArena: '→ entrar',
   },
   difficulty: {
     easy: 'fácil',
@@ -78,7 +85,7 @@ export default {
   chat: {
     eyebrow: 'conversación',
     idleGit:
-      'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña. Los comandos viven en el terminal, donde `git <comando> --help` te dice qué soporta esta arena; esta caja es para los porqués.',
+      'Tus comandos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña. Los comandos viven en el terminal, donde `git help` y `git COMANDO --help` te dicen qué soporta esta arena; esta caja es para los porqués.',
     idleTs:
       'Tus intentos y las respuestas del mentor aparecen aquí como una conversación. Mientras practicas el mentor solo da empujones, nunca destripa; después de un desvelado o un acierto, enseña. Las ediciones viven en el editor del workspace; Run pide a la arena que juzgue lo que devuelven los exports. Esta caja es para los porqués.',
     placeholderLive: 'Pide un empujón…',

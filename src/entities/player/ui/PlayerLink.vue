@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { githubAvatarUrl, githubProfileUrl } from '../lib/github.ts'
 
 const props = defineProps<{ player: string }>()
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const imgBroken = ref(false)
 </script>
 
@@ -31,6 +31,6 @@ const imgBroken = ref(false)
         @error="imgBroken = true"
       />
     </span>
-    {{ props.player }}
+    <span class="hidden sm:inline">{{ props.player }}</span>
   </a>
 </template>

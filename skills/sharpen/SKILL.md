@@ -1,6 +1,6 @@
 ---
 name: sharpen
-description: Launch or stop the sharpen arena, a local web app with timed Git challenges, a real in-browser Git terminal, and a Socratic AI mentor. Use when the user wants to practice, play, or "sharpen" their Git skills, and when they want the arena server stopped.
+description: Launch or stop the sharpen arena, a local web app with timed challenges (Git terminal and TypeScript workspace), and a Socratic AI mentor. Use when the user wants to practice, play, or "sharpen" their engineering skills, and when they want the arena server stopped.
 model: sonnet
 ---
 

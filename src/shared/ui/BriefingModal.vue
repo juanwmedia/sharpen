@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ start: []; cancel: [] }>()
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const startEl = ref<HTMLButtonElement | null>(null)
 
 function onKeydown(e: KeyboardEvent): void {

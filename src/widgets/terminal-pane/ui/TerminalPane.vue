@@ -17,7 +17,7 @@ import { TermShell } from '@/shared/lib/bash-shell.ts'
 defineProps<{ pinned?: boolean }>()
 defineEmits<{ 'toggle-pin': [] }>()
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const host = ref<HTMLElement | null>(null)
 let term: WTerm | null = null
 
@@ -30,11 +30,25 @@ defineExpose({
 
 onMounted(async () => {
   if (!host.value) return
-  // Fixed geometry: TERMINAL_ROWS at the 20px row height equals the container
-  // exactly, so a fresh terminal never shows a scrollbar. Long output rolls
-  // into wterm's scrollback, which is when a scrollbar SHOULD appear.
-  term = new WTerm(host.value, { cols: TERMINAL_COLS, rows: TERMINAL_ROWS, cursorBlink: true, autoResize: false })
+  // Rows stay fixed via #terminal height in CSS (TERMINAL_ROWS * row-height).
+  // Cols follow the pane width (autoResize): a fixed 100-col grid was blowing
+  // the whole arena past the viewport on phones.
+  term = new WTerm(host.value, {
+    cols: TERMINAL_COLS,
+    rows: TERMINAL_ROWS,
+    cursorBlink: true,
+    autoResize: true,
+  })
   await term.init()
+  // wterm.init() focuses a textarea it marks aria-hidden (Chromium warns).
+  // Expose it to AT and keep desktop autofocus; on phones blur so the first
+  // tap is not stolen by an off-screen input.
+  const hiddenInput = host.value.querySelector('textarea')
+  if (hiddenInput) {
+    hiddenInput.removeAttribute('aria-hidden')
+    hiddenInput.setAttribute('aria-label', t('terminal.title'))
+  }
+  if (window.matchMedia('(max-width: 640px)').matches) hiddenInput?.blur()
 
   const shell = new TermShell({
     exec: execCommand,
@@ -49,7 +63,6 @@ onMounted(async () => {
   // The pane can mount before the arena finishes booting (learn mode has no
   // briefing gate), so the store repaints the prompt when the branch lands.
   registerPromptRefresher(() => shell.refreshPrompt())
-  term.focus()
 })
 
 onBeforeUnmount(() => {
@@ -61,30 +74,32 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="overflow-hidden rounded-panel border border-line-strong bg-bg-deep shadow-[0_24px_60px_rgb(4_8_16_/_0.55)] transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line-strong))]"
+    class="min-w-0 overflow-hidden rounded-panel border border-line-strong bg-bg-deep shadow-[0_24px_60px_rgb(4_8_16_/_0.55)] transition-[border-color] duration-150 focus-within:border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line-strong))]"
   >
-    <div class="flex items-center gap-2 border-b border-line px-3.5 py-2.5">
-      <span class="h-[11px] w-[11px] rounded-full bg-[#ff5f57]"></span>
-      <span class="h-[11px] w-[11px] rounded-full bg-[#febc2e]"></span>
-      <span class="h-[11px] w-[11px] rounded-full bg-[#28c840]"></span>
-      <span class="ml-2 font-mono text-[11.5px] text-faint">{{ t('terminal.title') }}</span>
-      <i18n-t keypath="terminal.hint" tag="span" class="ml-auto font-mono text-[11px] text-faint">
-        <template #enter><kbd>Enter</kbd></template>
-      </i18n-t>
-      <kbd class="ml-2.5" :title="t('shortcut.swap')">{{ SWAP_SHORTCUT_LABEL }}</kbd>
-      <button
-        class="ml-2.5 cursor-pointer rounded-[7px] border bg-transparent px-[7px] py-1 text-xs leading-none transition-[opacity,border-color] duration-150"
-        :class="
-          pinned
-            ? 'border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line))] opacity-100'
-            : 'border-line opacity-55 hover:opacity-100'
-        "
-        type="button"
-        :title="pinned ? t('terminal.unpin') : t('terminal.pin')"
-        @click="$emit('toggle-pin')"
-      >
-        {{ pinned ? '📌' : '📍' }}
-      </button>
+    <div class="flex items-center gap-2 border-b border-line px-3 py-2.5 sm:px-3.5">
+      <span class="h-[11px] w-[11px] shrink-0 rounded-full bg-[#ff5f57]"></span>
+      <span class="h-[11px] w-[11px] shrink-0 rounded-full bg-[#febc2e]"></span>
+      <span class="h-[11px] w-[11px] shrink-0 rounded-full bg-[#28c840]"></span>
+      <span class="ml-2 min-w-0 truncate font-mono text-[11.5px] text-faint">{{ t('terminal.title') }}</span>
+      <div class="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+        <span class="hidden font-mono text-[11px] text-faint sm:inline">
+          {{ t('terminal.hint', { enter: 'Enter' }) }}
+        </span>
+        <kbd :title="t('shortcut.swap')">{{ SWAP_SHORTCUT_LABEL }}</kbd>
+        <button
+          class="cursor-pointer rounded-[7px] border bg-transparent px-[7px] py-1 text-xs leading-none transition-[opacity,border-color] duration-150"
+          :class="
+            pinned
+              ? 'border-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-line))] opacity-100'
+              : 'border-line opacity-55 hover:opacity-100'
+          "
+          type="button"
+          :title="pinned ? t('terminal.unpin') : t('terminal.pin')"
+          @click="$emit('toggle-pin')"
+        >
+          {{ pinned ? '📌' : '📍' }}
+        </button>
+      </div>
     </div>
     <div id="terminal" ref="host"></div>
   </div>

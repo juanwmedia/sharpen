@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ reveal: []; wipe: [] }>()
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const revealOpen = ref(false)
 const wipeOpen = ref(false)
 

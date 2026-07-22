@@ -30,6 +30,12 @@
 
   --radius-panel: 14px;
 
+  /* Wider than Tailwind's 2xl (96rem / 1536px). Must stay in rem: a px
+     breakpoint sorts before rem ones, so 2xl:grid-cols-4 would override
+     3xl/4xl forever on ultrawide viewports. */
+  --breakpoint-3xl: 112.5rem; /* 1800px */
+  --breakpoint-4xl: 137.5rem; /* 2200px */
+
   --animate-caret-blink: caret-blink 1.1s steps(1) infinite;
   --animate-pulse-beat: pulse-beat 1s ease-in-out infinite;
   --animate-pulse-dot: pulse-beat 1.2s ease-in-out infinite;
@@ -64,6 +70,9 @@
 }
 
 @layer base {
+  html {
+    overflow-x: clip;
+  }
   body {
     background:
       radial-gradient(1200px 500px at 80% -12%, var(--color-accent-soft), transparent 60%),
@@ -140,13 +149,25 @@
     --term-color-6: #4ec9b0;
     --term-color-14: #4ec9b0;
     --term-font-family: var(--font-mono);
-    --term-font-size: 13.5px;
-    --term-line-height: 1.5;
-    --term-row-height: 20px;
+    --term-font-size: 12px;
+    --term-line-height: 1.45;
+    --term-row-height: 18px;
+    /* Height locks row count (autoResize); width is 100% so cols fit the pane. */
+    box-sizing: border-box;
+    width: 100%;
+    height: calc(var(--term-row-height) * 20 + 30px);
     background: transparent;
-    padding: 14px 18px 16px;
+    padding: 12px 10px 14px;
     border-radius: 0;
     box-shadow: none;
+  }
+  @media (min-width: 640px) {
+    #terminal.wterm {
+      --term-font-size: 13.5px;
+      --term-line-height: 1.5;
+      --term-row-height: 20px;
+      padding: 14px 18px 16px;
+    }
   }
   /* The cursor invites typing even before the terminal has focus: dim blink
      unfocused, solid accent blink focused. */

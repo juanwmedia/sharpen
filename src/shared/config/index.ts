@@ -4,8 +4,8 @@
 export const COUNTDOWN_STEPS = ['3', '2', '1'] as const
 export const COUNTDOWN_STEP_MS = 550
 
-/** Terminal geometry: 20 rows at the 20px row height fills the frame exactly,
- * so a fresh terminal never shows a scrollbar (see TerminalPane). */
+/** Terminal geometry: rows stay fixed (CSS height on #terminal); cols start
+ * here then follow the pane width via wterm autoResize (see TerminalPane). */
 export const TERMINAL_COLS = 100
 export const TERMINAL_ROWS = 20
 
@@ -51,6 +51,7 @@ export const DEFAULT_TIME_LIMIT_MS = 60_000
 export const LOCALE_STORAGE_KEY = 'sharpen.locale'
 export const RUN_MODE_STORAGE_KEY = 'sharpen.runMode'
 export const MENTOR_NUDGES_STORAGE_KEY = 'sharpen.mentorNudges'
+export const KIND_FILTER_STORAGE_KEY = 'sharpen.kindFilter'
 
 /** Debounce for writing learn progress to ~/.sharpen/learn/. */
 export const LEARN_SAVE_DEBOUNCE_MS = 400

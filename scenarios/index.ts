@@ -34,9 +34,24 @@ import stalePaint from './ts/stale-paint/index.ts'
 import { slugify } from './slug.ts'
 import type { Scenario, ScenarioSummary } from '../engine/types.ts'
 
-// Full registry (git + ts). TS pack first (concept ladder), then git.
-// Pack selector / filter UI is a follow-up on the picker.
+// Full registry (git + ts). Git first in the All view; each pack keeps its
+// own ladder when filtered.
 export const scenarios: Scenario[] = [
+  saveYourWork,
+  takeItBack,
+  notOnMain,
+  shipOnlyTheFix,
+  stagedButInvisible,
+  leakedSecret,
+  theVanishedFile,
+  cleanSweep,
+  wrongBranchWetPaint,
+  abortTheExperiment,
+  forgotTheReceipt,
+  softLandingWrongBranch,
+  tipBelongsOnFeature,
+  timeMachineRecovery,
+  halfDeleted,
   tipJarLies,
   freeShippingGate,
   cartThatLies,
@@ -55,21 +70,6 @@ export const scenarios: Scenario[] = [
   oneClient,
   narrowTheStatus,
   stalePaint,
-  saveYourWork,
-  takeItBack,
-  notOnMain,
-  shipOnlyTheFix,
-  stagedButInvisible,
-  leakedSecret,
-  theVanishedFile,
-  cleanSweep,
-  wrongBranchWetPaint,
-  abortTheExperiment,
-  forgotTheReceipt,
-  softLandingWrongBranch,
-  tipBelongsOnFeature,
-  timeMachineRecovery,
-  halfDeleted,
 ]
 
 export function getScenario(id: string): Scenario | undefined {

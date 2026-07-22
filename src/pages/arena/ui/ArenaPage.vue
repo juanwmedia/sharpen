@@ -16,7 +16,7 @@ import { VerdictPanel } from '@/widgets/verdict-panel/index.ts'
 import { DEFAULT_TIME_LIMIT_MS, ROUTE_NAMES, SWAP_SHORTCUT_CODES } from '@/shared/config/index.ts'
 import { lt } from '@/shared/i18n/index.ts'
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const route = useRoute()
 const router = useRouter()
 const { state, prepareScenario, startRun, beginChallenge, leaveRun, askMentor, revealSolution, wipeLearn } =
@@ -82,19 +82,19 @@ const terminalPinned = ref(true)
 </script>
 
 <template>
-  <main class="relative mx-auto grid max-w-[1280px] grid-cols-[minmax(0,1fr)_320px] gap-[22px] px-7 pt-[26px] pb-[60px] max-[980px]:grid-cols-1">
-    <section class="grid content-start gap-4">
-      <div v-if="state.scenario && !inBriefing" class="panel px-[22px]">
-        <div class="mb-1.5 flex items-center gap-3.5">
+  <main class="relative mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-4 overflow-x-clip px-4 pt-5 pb-12 min-[981px]:grid-cols-[minmax(0,1fr)_320px] sm:gap-[22px] sm:px-7 sm:pt-[26px] sm:pb-[60px]">
+    <section class="grid min-w-0 content-start gap-4">
+      <div v-if="state.scenario && !inBriefing" class="panel min-w-0 px-4 sm:px-[22px]">
+        <div class="mb-1.5 flex min-w-0 flex-wrap items-center gap-2.5 sm:gap-3.5">
           <button
-            class="cursor-pointer rounded-lg border border-line bg-transparent px-2.5 py-[3px] text-[15px] text-muted hover:border-accent hover:text-ink"
+            class="shrink-0 cursor-pointer rounded-lg border border-line bg-transparent px-2.5 py-[3px] text-[15px] text-muted hover:border-accent hover:text-ink"
             type="button"
             :title="t('arena.back')"
             @click="backToPicker"
           >
             ←
           </button>
-          <h2 class="m-0 font-mono text-[19px] tracking-[-0.02em]">{{ lt(state.scenario.title) }}</h2>
+          <h2 class="m-0 min-w-0 flex-1 font-mono text-[17px] tracking-[-0.02em] break-words sm:text-[19px]">{{ lt(state.scenario.title) }}</h2>
           <Chip>{{ t(`difficulty.${state.scenario.difficulty}`) }}</Chip>
         </div>
         <ScenarioBriefing
@@ -107,7 +107,7 @@ const terminalPinned = ref(true)
         />
       </div>
       <template v-if="!inBriefing">
-        <div :class="{ 'sticky top-3 z-10': terminalPinned }">
+        <div class="min-w-0" :class="{ 'sticky top-3 z-10': terminalPinned }">
           <TsWorkspacePane
             v-if="state.scenario && isTsKind"
             ref="tsPane"
@@ -133,7 +133,7 @@ const terminalPinned = ref(true)
       </template>
     </section>
 
-    <aside v-if="!inBriefing" class="grid content-start gap-4">
+    <aside v-if="!inBriefing" class="grid min-w-0 content-start gap-4">
       <TimerRing
         v-if="state.mode === 'challenge'"
         :status="state.status"
@@ -158,7 +158,7 @@ const terminalPinned = ref(true)
     >
       <span
         :key="state.countdownNum"
-        class="font-mono text-[140px] font-extrabold text-accent animate-drop-in motion-reduce:animate-none"
+        class="font-mono text-[min(140px,28vw)] font-extrabold text-accent animate-drop-in motion-reduce:animate-none"
       >
         {{ state.countdownNum }}
       </span>
