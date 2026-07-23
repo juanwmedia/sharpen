@@ -41,10 +41,22 @@
   --animate-pulse-dot: pulse-beat 1.2s ease-in-out infinite;
   --animate-thinking: thinking-pulse 1.4s ease-in-out infinite;
   --animate-drop-in: drop-in 0.5s ease-out;
+  --animate-update-blink: update-blink 1.1s ease-in-out infinite;
 
   @keyframes caret-blink {
     50% {
       opacity: 0;
+    }
+  }
+  @keyframes update-blink {
+    0%,
+    100% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+    50% {
+      opacity: 0.45;
+      filter: brightness(1.35);
     }
   }
   @keyframes pulse-beat {

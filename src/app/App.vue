@@ -45,7 +45,12 @@ onMounted(() => void boot())
       <span class="hidden md:contents">
         <Chip tone="dim">{{ t('app.engine', { version: state.engineVersion }) }}</Chip>
       </span>
-      <Chip v-if="state.updateAvailable" tone="accent" :title="t('app.updateHint')">
+      <Chip
+        v-if="state.updateAvailable"
+        tone="err"
+        class="animate-update-blink motion-reduce:animate-none"
+        :title="t('app.updateHint')"
+      >
         {{ t('app.updateAvailable', { version: state.updateAvailable }) }}
       </Chip>
       <RunModeSwitch />
