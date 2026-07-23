@@ -52,6 +52,7 @@ export const LOCALE_STORAGE_KEY = 'sharpen.locale'
 export const RUN_MODE_STORAGE_KEY = 'sharpen.runMode'
 export const MENTOR_NUDGES_STORAGE_KEY = 'sharpen.mentorNudges'
 export const KIND_FILTER_STORAGE_KEY = 'sharpen.kindFilter'
+export const HIDE_COMPLETED_STORAGE_KEY = 'sharpen.hideCompleted'
 
 /** Debounce for writing learn progress to ~/.sharpen/learn/. */
 export const LEARN_SAVE_DEBOUNCE_MS = 400

@@ -31,6 +31,8 @@ export default {
       ts: 'TypeScript',
     },
     count: '{n} scenarios',
+    hideCompleted: 'Hide completed',
+    hidingCompleted: 'Hiding {n} completed',
     meta: '{pack} · {difficulty} · {seconds}s',
     enterArena: '→ enter',
   },

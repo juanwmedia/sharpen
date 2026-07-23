@@ -100,18 +100,34 @@ onBeforeUnmount(() => {
   monaco = null
 })
 
-// Wipe / new run: reseed on runId only. Do not clear on pass/reveal or the
-// solve line from registerStatusSink disappears.
+// Wipe / new run: reseed when the run becomes ready. startRun publishes runId
+// while status is still idle (restore may still replay the transcript), so
+// watching runId alone skipped the wipe path and left Monaco on the solved
+// buffer — one Run then wrote that buffer back and "passed" instantly.
 watch(
-  () => state.runId,
-  (runId) => {
+  () => [state.runId, state.status] as const,
+  ([runId, status], previous) => {
     if (!runId) return
-    if (state.status !== RUN_STATUS.live && state.status !== RUN_STATUS.passed && state.status !== RUN_STATUS.revealed) {
+    if (
+      status !== RUN_STATUS.live &&
+      status !== RUN_STATUS.passed &&
+      status !== RUN_STATUS.revealed
+    ) {
+      return
+    }
+    const prevStatus = previous?.[1]
+    const prevRunId = previous?.[0]
+    // Keep the solve/reveal console line: live → passed/revealed is not a reset.
+    if (
+      prevRunId === runId &&
+      prevStatus === RUN_STATUS.live &&
+      (status === RUN_STATUS.passed || status === RUN_STATUS.revealed)
+    ) {
       return
     }
     clearConsole()
     void seedFromArena()
-  }
+  },
 )
 
 async function onRun(): Promise<void> {

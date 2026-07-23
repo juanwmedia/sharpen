@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { slugify } from '@scenarios/slug.ts'
 import { useGame } from '@/entities/game/index.ts'
+import { HideCompletedToggle, useHideCompleted } from '@/features/hide-completed/index.ts'
 import { KindFilter, useKindFilter } from '@/features/kind-filter/index.ts'
 import { KIND_LOGOS, ROUTE_NAMES } from '@/shared/config/index.ts'
 import { lt } from '@/shared/i18n/index.ts'
@@ -14,11 +15,22 @@ const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const { state } = useGame()
 const filter = useKindFilter()
+const hideCompleted = useHideCompleted()
 
-const visible = computed(() =>
+const byKind = computed(() =>
   filter.value === 'all'
     ? state.scenarios
     : state.scenarios.filter((c) => c.kind === filter.value),
+)
+
+const hiddenCompletedCount = computed(
+  () => byKind.value.filter((c) => state.completed.includes(c.id)).length,
+)
+
+const visible = computed(() =>
+  hideCompleted.value
+    ? byKind.value.filter((c) => !state.completed.includes(c.id))
+    : byKind.value,
 )
 
 function enterArena(c: { pack: string; title: { en: string } }): void {
@@ -38,10 +50,21 @@ function enterArena(c: { pack: string; title: { en: string } }): void {
         {{ t(state.mode === 'challenge' ? 'picker.ledeChallenge' : 'picker.ledeLearn') }}
       </p>
       <div class="mt-6 mb-5 flex flex-wrap items-center justify-between gap-3">
-        <KindFilter v-model="filter" />
+        <div class="flex flex-wrap items-center gap-2.5">
+          <KindFilter v-model="filter" />
+          <HideCompletedToggle v-model="hideCompleted" />
+        </div>
         <span class="font-mono text-[11px] tracking-[0.08em] uppercase text-faint">
           {{ t('picker.count', { n: visible.length }) }}
         </span>
+      </div>
+      <div
+        v-if="hideCompleted && hiddenCompletedCount > 0"
+        class="mb-5 flex items-center gap-2 rounded-panel border border-accent bg-accent-soft px-3.5 py-2.5 font-mono text-[12.5px] text-accent"
+        role="status"
+      >
+        <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+        {{ t('picker.hidingCompleted', { n: hiddenCompletedCount }) }}
       </div>
       <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6">
         <button
