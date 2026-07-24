@@ -45,3 +45,5 @@ jobs:
         env:
           SHARPEN_NO_MENTOR: '1'
           SHARPEN_NO_UPDATE_CHECK: '1'
+          # Monaco-heavy vite build OOMs the default heap on macos-latest.
+          NODE_OPTIONS: '--max-old-space-size=8192'

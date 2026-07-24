@@ -110,9 +110,18 @@ await build({
   external: ['@mongodb-js/zstd', 'node-liblzma'],
   // Bundled CJS deps still call require() for node builtins at runtime;
   // esbuild's __require helper defers to a scope-level `require` when one
-  // exists. Aliased import: the bundle itself also imports createRequire.
+  // exists. typescript.js (pulled in by the TS arena) also reads __filename
+  // for case-sensitivity probes; ESM has neither, so define both from
+  // import.meta.url. Aliased import: the bundle itself also imports createRequire.
   banner: {
-    js: "import { createRequire as __sharpenRequire } from 'node:module'; const require = __sharpenRequire(import.meta.url);",
+    js: [
+      "import { createRequire as __sharpenRequire } from 'node:module';",
+      "import { fileURLToPath as __sharpenFilename } from 'node:url';",
+      "import { dirname as __sharpenDirname } from 'node:path';",
+      'const __filename = __sharpenFilename(import.meta.url);',
+      'const __dirname = __sharpenDirname(__filename);',
+      'const require = __sharpenRequire(import.meta.url);',
+    ].join(''),
   },
   logLevel: 'warning',
 })
