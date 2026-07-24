@@ -81,11 +81,12 @@ if (!dryRun) {
   }
 }
 
-// 3. Gates.
-step('gates: npm test')
-sh('npm test')
+// 3. Gates. Build first: the SPA deep-link API test (and the bundle smoke)
+// need dist/. A fresh CI checkout has none.
 step('gates: npm run build (typecheck + vite)')
 sh('npm run build')
+step('gates: npm test')
+sh('npm test')
 
 // 4. Bundle. One plain-node file: no tsx, no node_modules on player machines.
 // The stage dir name starts with a dot on purpose: the launcher installs the
