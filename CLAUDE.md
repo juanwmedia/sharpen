@@ -203,7 +203,10 @@ vocabulary, boilerplate, checklist). Canonical example:
   `package.json` in sync): `/plugin update` only refreshes installed copies
   when the version changes. Releasing IS publishing an artifact:
   `npm run release` (scripts/release.mjs) refuses a dirty tree, failing
-  gates, an existing tag or an unpushed HEAD; bundles the server with
+  gates, an existing tag, an unpushed HEAD, or a HEAD without a green
+  Cross-OS release gate (`.github/workflows/cross-os-release-gate.yml`:
+  ubuntu + windows + macos dry-run; dispatch with
+  `gh workflow run cross-os-release-gate.yml`); bundles the server with
   esbuild into a single `server.mjs`; smoke-boots that bundle and solves
   clean-sweep through the API; then publishes `sharpen-v<version>.tar.gz` +
   `.sha256` via `gh release create`. The artifact mirrors the repo layout

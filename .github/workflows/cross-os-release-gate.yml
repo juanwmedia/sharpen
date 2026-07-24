@@ -1,0 +1,47 @@
+# Cross-OS release gate. Not on every push: only on demand, and after a
+# GitHub Release is published (post-check). Local `npm run release` refuses
+# to publish unless the latest completed run of this workflow for HEAD is green.
+#
+# Covers what we can automate: install, tests, typecheck+build, esbuild
+# bundle, and the same API smoke the release ritual uses (boot, SPA deep
+# link, solve git/clean-sweep). Mentor spawn and Claude Code plugin install
+# stay out of scope (need a real subscription + interactive UI).
+name: Cross-OS release gate
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+concurrency:
+  group: cross-os-gate-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Full release ritual without publish: npm test, vite build (with
+      # typecheck), esbuild server.mjs, boot the artifact, solve clean-sweep.
+      - name: Release dry-run (test + build + bundle + smoke)
+        run: node scripts/release.mjs --dry-run
+        env:
+          SHARPEN_NO_MENTOR: '1'
+          SHARPEN_NO_UPDATE_CHECK: '1'

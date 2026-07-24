@@ -58,6 +58,27 @@ if (!dryRun) {
   } catch {
     fail('gh is not authenticated; run `gh auth login`')
   }
+  // Cross-OS gate must have passed for this exact commit (ubuntu + windows +
+  // macos dry-run). Dispatch it before releasing; the post-release workflow
+  // run is only a safety net and does not unblock publish.
+  step('cross-os gate')
+  const headSha = capture('git rev-parse HEAD')
+  let gateRuns
+  try {
+    gateRuns = JSON.parse(
+      capture(
+        `gh run list --workflow cross-os-release-gate.yml --commit ${headSha} --json conclusion,status,databaseId --limit 20`
+      )
+    )
+  } catch (err) {
+    fail(`could not query Cross-OS gate runs: ${err.message ?? err}`)
+  }
+  const gateOk = Array.isArray(gateRuns) && gateRuns.some((r) => r.status === 'completed' && r.conclusion === 'success')
+  if (!gateOk) {
+    fail(
+      `no successful Cross-OS gate for ${headSha.slice(0, 7)}; run: gh workflow run cross-os-release-gate.yml --ref main`
+    )
+  }
 }
 
 // 3. Gates.
